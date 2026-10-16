@@ -36,7 +36,7 @@ const personDetailsSeed = {
   },
   "3": {
     "v": "St",
-    "duty": "Kaffe&Kuchen",
+    "duty": "Kaffee&Kuchen",
     "instrument": "Klavier, Cello"
   },
   "4": {
@@ -61,7 +61,7 @@ const personDetailsSeed = {
   },
   "8": {
     "v": "Sa",
-    "duty": "Kaffe&Kuchen",
+    "duty": "Kaffee&Kuchen",
     "instrument": "Klavier, Querflöte"
   },
   "9": {
