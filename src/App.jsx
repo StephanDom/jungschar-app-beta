@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   AlertTriangle, ArrowUp, Ban, CalendarDays, Camera, Check, CheckCircle2,
   ChevronLeft, ChevronRight, ClipboardList, Home,
-  Plus, Search, Trash2, Users, X
+  Pencil, Plus, Search, Trash2, Users, X
 } from "lucide-react";
 import defaultGroupPhoto from "./assets/04_Jungschar-2012.jpg";
 
@@ -23,6 +23,159 @@ const readStored = (key, fallback) => {
   }
 };
 
+const personDetailsSeed = {
+  "1": {
+    "v": "Sa",
+    "duty": "",
+    "instrument": "Klav., Git., Pos., Akk."
+  },
+  "2": {
+    "v": "St",
+    "duty": "Stühle",
+    "instrument": "Gitarre"
+  },
+  "3": {
+    "v": "St",
+    "duty": "Kaffe&Kuchen",
+    "instrument": "Klavier, Cello"
+  },
+  "4": {
+    "v": "J",
+    "duty": "Salate",
+    "instrument": "Klavier"
+  },
+  "5": {
+    "v": "Sa",
+    "duty": "",
+    "instrument": "Klavier"
+  },
+  "6": {
+    "v": "J",
+    "duty": "Geburtstagskarten",
+    "instrument": "Harfe, Mandoline"
+  },
+  "7": {
+    "v": "St",
+    "duty": "Liederbücher",
+    "instrument": "Trompete"
+  },
+  "8": {
+    "v": "Sa",
+    "duty": "Kaffe&Kuchen",
+    "instrument": "Klavier, Querflöte"
+  },
+  "9": {
+    "v": "J",
+    "duty": "Geburtstagskarten",
+    "instrument": "Mandoline"
+  },
+  "10": {
+    "v": "Sa",
+    "duty": "Anwesenheitsliste",
+    "instrument": "Mandoline, Klavier"
+  },
+  "11": {
+    "v": "St",
+    "duty": "",
+    "instrument": ""
+  },
+  "12": {
+    "v": "St",
+    "duty": "",
+    "instrument": "Klavier, Akkordeon"
+  },
+  "13": {
+    "v": "J",
+    "duty": "Gebetsliste",
+    "instrument": "Klavier"
+  },
+  "14": {
+    "v": "J",
+    "duty": "",
+    "instrument": "Akkordeon"
+  },
+  "15": {
+    "v": "Sa",
+    "duty": "",
+    "instrument": ""
+  },
+  "16": {
+    "v": "St",
+    "duty": "Stühle",
+    "instrument": "Klavier"
+  },
+  "17": {
+    "v": "Sa",
+    "duty": "Programm",
+    "instrument": "Querflöte, Klavier"
+  },
+  "18": {
+    "v": "J",
+    "duty": "Liederbücher",
+    "instrument": "Klavier, Geige"
+  },
+  "19": {
+    "v": "Sa",
+    "duty": "",
+    "instrument": ""
+  },
+  "20": {
+    "v": "J",
+    "duty": "",
+    "instrument": ""
+  },
+  "21": {
+    "v": "St",
+    "duty": "",
+    "instrument": ""
+  },
+  "22": {
+    "v": "Sa",
+    "duty": "",
+    "instrument": ""
+  },
+  "23": {
+    "v": "Sa",
+    "duty": "",
+    "instrument": "Klavier"
+  },
+  "24": {
+    "v": "Sa",
+    "duty": "",
+    "instrument": "Geige"
+  },
+  "25": {
+    "v": "J",
+    "duty": "",
+    "instrument": ""
+  },
+  "26": {
+    "v": "Sa",
+    "duty": "Salate, Fragebox",
+    "instrument": "Klavier"
+  },
+  "27": {
+    "v": "St",
+    "duty": "",
+    "instrument": ""
+  },
+  "28": {
+    "v": "St",
+    "duty": "",
+    "instrument": "Klav., Tromp., Git."
+  },
+  "29": {
+    "v": "J",
+    "duty": "Stühle",
+    "instrument": ""
+  },
+  "30": {
+    "v": "J",
+    "duty": "Anwesenh., Fragebox",
+    "instrument": "Geige, Klavier"
+  }
+};
+
 const peopleSeed = [
   [1,"Akulenko","Mike","X","Sa","I",""],[2,"Biegler","Calvin","","St","I",""],
   [3,"Blackshear","Amaya","X","St","",""],[4,"Brant","Melia","X","J","I",""],
@@ -39,7 +192,7 @@ const peopleSeed = [
   [25,"Sippel","Daniel","","J","",""],[26,"Stiller","Ina","","Sa","I",""],
   [27,"Vlasiuk","Lisa","","St","",""],[28,"Vogel","Daniel","X","St","I",""],
   [29,"Wall","Nick","X","J","",""],[30,"Wedernikow","Sophia","X","J","",""]
-].map(([id,last,first,hg,v,hj1,hj2]) => ({id,last,first,hg,v,hj1,hj2,duty:"",instrument:""}));
+].map(([id,last,first,hg,v,hj1,hj2]) => ({id,last,first,hg,v:personDetailsSeed[id]?.v||v,hj1,hj2,duty:personDetailsSeed[id]?.duty||"",instrument:personDetailsSeed[id]?.instrument||""}));
 
 const scheduleSeed = [
   {
@@ -560,7 +713,15 @@ function AddPerson({draft,setDraft,onSave,onClose}){
 
 export default function App(){
   const [view,setView]=useState("home");
-  const [people,setPeople]=useState(() => sortPeople(readStored(STORAGE_KEYS.people, peopleSeed)));
+  const [people,setPeople]=useState(() => {
+    const stored=readStored(STORAGE_KEYS.people, null);
+    if(!stored) return sortPeople(peopleSeed);
+    return sortPeople(stored.map(person=>{
+      const seed=peopleSeed.find(item=>item.id===person.id);
+      if(!seed) return person;
+      return {...seed,...person,v:person.v||seed.v||"",duty:person.duty||seed.duty||"",instrument:person.instrument||seed.instrument||""};
+    }));
+  });
   const [attendance,setAttendance]=useState(() => readStored(STORAGE_KEYS.attendance, attendanceSeed));
   const [events]=useState(eventsSeed);
   const [schedule,setSchedule]=useState(() => readStored(STORAGE_KEYS.schedule, scheduleSeed));
@@ -572,6 +733,7 @@ export default function App(){
   const [photo,setPhoto]=useState(() => readStored(STORAGE_KEYS.photo, ""));
   const [showScrollTop,setShowScrollTop]=useState(false);
   const [showVisits,setShowVisits]=useState(false);
+  const [editingPersonId,setEditingPersonId]=useState(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.people, JSON.stringify(people));
@@ -626,6 +788,7 @@ export default function App(){
 
   const toggleAttendance=id=>setAttendance(old=>{const next=new Set(old[date]||[]);next.has(id)?next.delete(id):next.add(id);return {...old,[date]:[...next]};});
   const toggleFlag=(id,key)=>setPeople(old=>old.map(p=>p.id===id?{...p,[key]:p[key]?"":"X"}:p));
+  const updatePerson=(id,key,value)=>setPeople(old=>old.map(p=>p.id===id?{...p,[key]:value}:p));
   const saveNew=()=>{setPeople(old=>sortPeople([...old,{...draft,id:Math.max(0,...old.map(p=>p.id))+1}]));setDraft(blank);setAdding(false);};
   const deletePerson=person=>{if(!window.confirm(`${person.first} ${person.last} wirklich löschen? Die Person wird auch aus allen Anwesenheitslisten entfernt.`))return;setPeople(old=>old.filter(p=>p.id!==person.id));setAttendance(old=>Object.fromEntries(Object.entries(old).map(([eventDate,ids])=>[eventDate,ids.filter(id=>id!==person.id)])));};
   const uploadPhoto=e=>{const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=()=>setPhoto(String(reader.result));reader.readAsDataURL(file);};
@@ -690,7 +853,7 @@ export default function App(){
         {selectedEvent.cancelled?<div className="rounded-3xl bg-red-50 p-5 text-red-700"><Ban className="mb-2"/><b>Dieser Termin ist als Ausfall hinterlegt.</b></div>:<section className="overflow-hidden rounded-3xl bg-white">{attendancePeople.map(p=><button key={p.id} onClick={()=>toggleAttendance(p.id)} className="flex w-full items-center gap-3 border-b p-4 text-left"><span className={`grid h-11 w-11 place-items-center rounded-2xl border-2 ${present.has(p.id)?"border-emerald-600 bg-emerald-600 text-white":"border-slate-200 text-transparent"}`}><Check/></span><b className="flex-1">{p.last}, {p.first}</b></button>)}</section>}
       </>}
 
-      {view==="people"&&<><div className="flex items-center justify-between gap-3"><div><h2 className="text-2xl font-black">Teilnehmer</h2><p className="text-sm text-slate-500">HG, HJ1 und HJ2 direkt ändern</p></div><button onClick={()=>{setDraft(blank);setAdding(true)}} className="flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 font-black text-white"><Plus size={18}/>Hinzufügen</button></div><div className="relative"><Search className="absolute left-3 top-3 text-slate-400" size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Teilnehmer suchen" className="w-full rounded-2xl border bg-white py-2.5 pl-10"/></div><section className="grid gap-3 sm:grid-cols-2">{filteredPeople.map(p=><article key={p.id} className="rounded-[28px] bg-white p-4 shadow-sm"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 font-black text-white">{p.first[0]}{p.last[0]}</div><div className="flex-1"><div className="flex items-center gap-2"><span className="grid h-6 min-w-6 place-items-center rounded-full bg-slate-100 px-1 text-[11px] font-black text-slate-600">{overviewPeople.findIndex(person=>person.id===p.id)+1}</span><b>{p.last}, {p.first}</b></div>{p.v&&<div className="mt-1 text-xs font-bold text-blue-700">LEITER · {p.v}</div>}</div><button type="button" onClick={()=>deletePerson(p)} title="Teilnehmer löschen" className="grid h-10 w-10 place-items-center rounded-2xl bg-red-50 text-red-600 hover:bg-red-100"><Trash2 size={18}/></button></div><div className="mt-4 grid grid-cols-3 gap-2"><Flag active={!!p.hg} label="Heiliger Geist" color="violet" onClick={()=>toggleFlag(p.id,"hg")}/><Flag active={!!p.hj1} label="Gespräch HJ1" onClick={()=>toggleFlag(p.id,"hj1")}/><Flag active={!!p.hj2} label="Gespräch HJ2" onClick={()=>toggleFlag(p.id,"hj2")}/></div>{(()=>{const stats=personStats(p);return <div className="mt-4 rounded-2xl bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><div><span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Letzte 5 Anwesenheiten</span><div className="mt-2 flex items-center gap-2">{stats.lastFive.length?stats.lastFive.map(item=><span key={item.date} title={`${fmt(item.date)} · ${item.present?"anwesend":"abwesend"}`} aria-label={`${fmt(item.date)}: ${item.present?"anwesend":"abwesend"}`} className={`h-4 w-4 rounded-full ring-2 ring-white ${item.present?"bg-emerald-500":"bg-red-500"}`}/>):<span className="text-xs text-slate-400">Noch keine Termine</span>}</div></div><div className="text-right"><span className="block text-2xl font-black text-blue-700">{stats.percent}%</span><span className="text-[10px] text-slate-500">{stats.attended} anwesend · {stats.absent} abwesend</span></div></div></div>})()}</article>)}</section></>}
+      {view==="people"&&<><div className="flex items-center justify-between gap-3"><div><h2 className="text-2xl font-black">Teilnehmer</h2><p className="text-sm text-slate-500">Leiter, Dienste, Instrumente und Gesprächsstände</p></div><button onClick={()=>{setDraft(blank);setAdding(true)}} className="flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 font-black text-white"><Plus size={18}/>Hinzufügen</button></div><div className="relative"><Search className="absolute left-3 top-3 text-slate-400" size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Teilnehmer suchen" className="w-full rounded-2xl border bg-white py-2.5 pl-10"/></div><section className="grid gap-3 sm:grid-cols-2">{filteredPeople.map(p=>{const editing=editingPersonId===p.id;const stats=personStats(p);return <article key={p.id} className="rounded-[28px] bg-white p-4 shadow-sm"><div className="flex items-start gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 font-black text-white">{p.first[0]}{p.last[0]}</div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="grid h-6 min-w-6 place-items-center rounded-full bg-slate-100 px-1 text-[11px] font-black text-slate-600">{overviewPeople.findIndex(person=>person.id===p.id)+1}</span><b>{p.last}, {p.first}</b></div><div className="mt-2 flex flex-wrap gap-2">{p.v&&<span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-black text-blue-800">LEITER · {p.v}</span>}{p.duty&&<span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-black text-amber-900">DIENST · {p.duty}</span>}{p.instrument&&<span className="rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-black text-violet-900">INSTRUMENT · {p.instrument}</span>}</div></div><button type="button" onClick={()=>setEditingPersonId(editing?null:p.id)} title={editing?"Bearbeitung beenden":"Teilnehmer bearbeiten"} className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${editing?"bg-emerald-100 text-emerald-700":"bg-blue-50 text-blue-700"}`}>{editing?<Check size={18}/>:<Pencil size={18}/>}</button><button type="button" onClick={()=>deletePerson(p)} title="Teilnehmer löschen" className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-red-50 text-red-600 hover:bg-red-100"><Trash2 size={18}/></button></div>{editing&&<div className="mt-4 grid gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-3"><label><span className="mb-1 block text-xs font-black text-slate-600">Leiter</span><input value={p.v||""} onChange={e=>updatePerson(p.id,"v",e.target.value)} className="w-full rounded-xl border bg-white p-2.5 text-sm"/></label><label><span className="mb-1 block text-xs font-black text-slate-600">Dienst</span><input value={p.duty||""} onChange={e=>updatePerson(p.id,"duty",e.target.value)} className="w-full rounded-xl border bg-white p-2.5 text-sm"/></label><label><span className="mb-1 block text-xs font-black text-slate-600">Instrument</span><input value={p.instrument||""} onChange={e=>updatePerson(p.id,"instrument",e.target.value)} className="w-full rounded-xl border bg-white p-2.5 text-sm"/></label></div>}<div className="mt-4 grid grid-cols-3 gap-2"><Flag active={!!p.hg} label="Heiliger Geist" color="violet" onClick={()=>toggleFlag(p.id,"hg")}/><Flag active={!!p.hj1} label="Gespräch HJ1" onClick={()=>toggleFlag(p.id,"hj1")}/><Flag active={!!p.hj2} label="Gespräch HJ2" onClick={()=>toggleFlag(p.id,"hj2")}/></div><div className="mt-4 rounded-2xl bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><div><span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Letzte 5 Anwesenheiten</span><div className="mt-2 flex items-center gap-2">{stats.lastFive.length?stats.lastFive.map(item=><span key={item.date} title={`${fmt(item.date)} · ${item.present?"anwesend":"abwesend"}`} aria-label={`${fmt(item.date)}: ${item.present?"anwesend":"abwesend"}`} className={`h-4 w-4 rounded-full ring-2 ring-white ${item.present?"bg-emerald-500":"bg-red-500"}`}/>):<span className="text-xs text-slate-400">Noch keine Termine</span>}</div></div><div className="text-right"><span className="block text-2xl font-black text-blue-700">{stats.percent}%</span><span className="text-[10px] text-slate-500">{stats.attended} anwesend · {stats.absent} abwesend</span></div></div></div></article>})}</section></>}
 
       {view==="events"&&<><div className="flex items-start justify-between gap-3"><div><h2 className="text-2xl font-black">Termine</h2><p className="text-sm text-slate-500">Stundeninhalte 2026/27 und 2027/28 · Änderungen werden lokal gespeichert</p></div><div className="flex shrink-0 flex-col gap-2"><button type="button" onClick={scrollToNextEvent} className="rounded-2xl bg-blue-600 px-4 py-3 text-xs font-black text-white shadow-lg transition duration-300 hover:-translate-y-0.5 hover:bg-blue-700 active:scale-95">Nächster Termin</button><button type="button" onClick={()=>setShowVisits(value=>!value)} className="rounded-2xl bg-teal-700 px-4 py-3 text-xs font-black text-white shadow-lg transition duration-300 hover:-translate-y-0.5 hover:bg-teal-800 active:scale-95">{showVisits?"Auswertung schließen":"Besuche auswerten"}</button></div></div>{showVisits&&<section className="rounded-3xl border border-teal-200 bg-teal-50 p-5 shadow-sm"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-widest text-teal-700">Auswertung</p><h3 className="text-xl font-black text-teal-950">Alten- und Krankenbesuche</h3></div><span className="rounded-full bg-teal-700 px-3 py-1 text-xs font-black text-white">{visitEvents.length} Termine</span></div><div className="mt-4 grid gap-3">{visitEvents.length?visitEvents.map(item=><article key={item.date} className="rounded-2xl bg-white p-4"><b className="text-teal-950">{fmt(item.date)}</b><p className="mt-1 text-sm font-bold text-teal-800">Besucht: {extractVisited(item.content)||"nicht angegeben"}</p>{item.responsible&&<p className="mt-1 text-xs text-slate-500">Verantwortlich: <b>{item.responsible}</b></p>}<p className="mt-2 text-xs text-slate-500">{item.content}</p></article>):<p className="text-sm text-teal-900">Keine Alten- oder Krankenbesuche eingetragen.</p>}</div></section>}<section className="grid gap-3">{events.filter(e=>e.date>="2026-08-10"&&e.date<="2028-05-22").map(e=>{const plan=scheduleFor(e.date);const normalizedContent=plan.content.trim().toLowerCase();const isTheme=normalizedContent.startsWith("thema:")||normalizedContent.startsWith("themenreihe:");const isVisit=isVisitContent(plan.content);const isCancellation=e.cancelled||/(ferien|ausfall|passahmontag|pfingstmontag)/i.test(plan.content);return <article id={`event-${e.date}`} key={e.date} className={`scroll-mt-4 rounded-3xl p-4 shadow-sm transition duration-300 ${e.date===nextEvent.date?"border-2 border-blue-500 bg-blue-50/50":isVisit?"border-2 border-teal-400 bg-teal-50/60":"bg-white"}`}><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><b>{fmt(e.date)}</b>{e.date===nextEvent.date&&<span className="rounded-full bg-blue-600 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white">Nächster Termin</span>}</div><p className={`mt-1 text-xs font-bold ${isCancellation?"italic text-red-600":attendance[e.date]?"text-emerald-700":"text-slate-500"}`}>{attendance[e.date]?`${attendance[e.date].length} anwesend`:isCancellation?"Ausfall / Ferien":"noch nicht erfasst"}</p></div><button type="button" onClick={()=>{setDate(e.date);setView("attendance")}} className="flex shrink-0 items-center gap-1 rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition duration-300 hover:bg-blue-100 active:scale-95">Anwesenheit<ChevronRight size={15}/></button></div><label className={`mt-4 block rounded-2xl p-3 transition duration-300 ${isVisit?"border border-teal-300 bg-teal-50 shadow-sm":isTheme?"border border-amber-300 bg-amber-50 shadow-sm":""}`}><span className={`mb-1 block text-[10px] font-black uppercase tracking-wider ${isVisit?"text-teal-700":isTheme?"text-amber-700":"text-slate-500"}`}>{isVisit?"Alten- und Krankenbesuch":isTheme?"Thema / Themenreihe":"Inhalt"}</span><textarea rows="2" value={plan.content} onChange={event=>updateSchedule(e.date,"content",event.target.value)} placeholder="Inhalt eintragen" className={`w-full resize-none rounded-xl border p-3 text-sm outline-none focus:border-blue-400 ${isCancellation?"italic":""} ${isVisit?"border-teal-200 bg-white font-bold text-teal-950":isTheme?"border-amber-200 bg-white font-bold text-amber-950":"border-slate-200 bg-slate-50 focus:bg-white"}`}/></label><label className="mt-3 block"><span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500">Verantwortlich</span><input value={plan.responsible} onChange={event=>updateSchedule(e.date,"responsible",event.target.value)} placeholder="Verantwortliche Person eintragen" className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-blue-400 focus:bg-white"/></label></article>})}</section></>}
 
