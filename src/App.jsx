@@ -738,6 +738,7 @@ export default function App(){
   const scrollPositions=useRef({home:0,attendance:0,people:0,events:0,overview:0,preachers:0});
   const pendingScroll=useRef(0);
   const swipeStartX=useRef(null);
+  const pendingPastAttendance=useRef(null);
   const [people,setPeople]=useState(() => {
     const stored=readStored(STORAGE_KEYS.people, null);
     if(!stored) return sortPeople(peopleSeed);
@@ -768,6 +769,7 @@ export default function App(){
   const [photo,setPhoto]=useState(() => readStored(STORAGE_KEYS.photo, ""));
   const [showScrollTop,setShowScrollTop]=useState(false);
   const [showVisits,setShowVisits]=useState(false);
+  const [showPastAttendanceConfirm,setShowPastAttendanceConfirm]=useState(false);
   const [editingPersonId,setEditingPersonId]=useState(null);
 
   useEffect(() => {
@@ -820,7 +822,16 @@ export default function App(){
   const pastEvents=events.filter(e=>e.date<TODAY&&!e.cancelled&&attendance[e.date]);
   const lastFive=pastEvents.slice(-5).reverse();
   const lastThree=pastEvents.slice(-3);
+  const personStatsFor = person => {
+    const relevantEvents=pastEvents.filter(event=>!person.joinDate||event.date>=person.joinDate);
+    const attended=relevantEvents.filter(event=>(attendance[event.date]||[]).includes(person.id)).length;
+    const absent=relevantEvents.length-attended;
+    const percent=relevantEvents.length?Math.round((attended/relevantEvents.length)*100):0;
+    const recent=relevantEvents.slice(-5).map(event=>({date:event.date,present:(attendance[event.date]||[]).includes(person.id)}));
+    return {attended,absent,percent,total:relevantEvents.length,lastFive:recent};
+  };
   const missedThree=lastThree.length===3?people.filter(p=>{const wasAlreadyParticipant=lastThree.every(e=>!p.joinDate||e.date>=p.joinDate);return wasAlreadyParticipant&&lastThree.every(e=>!(attendance[e.date]||[]).includes(p.id));}):[];
+  const lowAttendancePeople=people.map(person=>({person,stats:personStatsFor(person)})).filter(item=>item.stats.total>0&&item.stats.percent<=50).sort((a,b)=>a.stats.percent-b.stats.percent||a.person.last.localeCompare(b.person.last,"de"));
   const filteredPeople=people.filter(p=>`${p.last} ${p.first}`.toLowerCase().includes(query.toLowerCase()));
   const attendancePeople=filteredPeople.filter(p=>showChecked||!present.has(p.id));
   const overviewEvents=events.filter(e=>e.date<=TODAY&&(attendance[e.date]||e.cancelled));
@@ -829,19 +840,28 @@ export default function App(){
   const preacherEvents=[...events].filter(event=>!event.cancelled);
   const preacherDisplayEvents=[...preacherEvents.filter(event=>event.date>=TODAY),...preacherEvents.filter(event=>event.date<TODAY).reverse()];
   const preacherName=eventDate=>preachers[eventDate]?.askedName||"Noch nicht festgelegt";
-  const personStats = person => {
-    const relevantEvents = pastEvents.filter(event => !person.joinDate || event.date >= person.joinDate);
-    const attended = relevantEvents.filter(event => (attendance[event.date] || []).includes(person.id)).length;
-    const absent = relevantEvents.length - attended;
-    const percent = relevantEvents.length ? Math.round((attended / relevantEvents.length) * 100) : 0;
-    const lastFive = relevantEvents.slice(-5).map(event => ({
-      date: event.date,
-      present: (attendance[event.date] || []).includes(person.id)
-    }));
-    return { attended, absent, percent, total: relevantEvents.length, lastFive };
-  };
+  const personStats = person => personStatsFor(person);
 
-  const toggleAttendance=id=>setAttendance(old=>{const next=new Set(old[date]||[]);next.has(id)?next.delete(id):next.add(id);return {...old,[date]:[...next]};});
+  const applyAttendanceToggle=(eventDate,id)=>setAttendance(old=>{const next=new Set(old[eventDate]||[]);next.has(id)?next.delete(id):next.add(id);return {...old,[eventDate]:[...next]};});
+  const toggleAttendance=id=>{
+    if(date<TODAY&&!sessionStorage.getItem("jungschar.pastAttendanceUnlocked")){
+      pendingPastAttendance.current={date,id};
+      setShowPastAttendanceConfirm(true);
+      return;
+    }
+    applyAttendanceToggle(date,id);
+  };
+  const confirmPastAttendanceEdit=()=>{
+    sessionStorage.setItem("jungschar.pastAttendanceUnlocked","true");
+    const pending=pendingPastAttendance.current;
+    pendingPastAttendance.current=null;
+    setShowPastAttendanceConfirm(false);
+    if(pending) applyAttendanceToggle(pending.date,pending.id);
+  };
+  const cancelPastAttendanceEdit=()=>{
+    pendingPastAttendance.current=null;
+    setShowPastAttendanceConfirm(false);
+  };
   const toggleFlag=(id,key)=>setPeople(old=>old.map(p=>p.id===id?{...p,[key]:p[key]?"":"X"}:p));
   const updatePerson=(id,key,value)=>setPeople(old=>old.map(p=>p.id===id?{...p,[key]:value}:p));
   const saveNew=()=>{setPeople(old=>sortPeople([...old,{...draft,id:Math.max(0,...old.map(p=>p.id))+1}]));setDraft(blank);setAdding(false);};
@@ -926,7 +946,7 @@ export default function App(){
         </section>
         <section className="rounded-[34px] bg-gradient-to-br from-blue-700 to-indigo-950 p-6 text-white shadow-xl"><p className="text-sm text-blue-200">Nächster Termin</p><h2 className="mt-1 text-3xl font-black">{fmt(nextEvent.date)}</h2><div className="mt-4 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm"><p className="text-[10px] font-black uppercase tracking-wider text-blue-200">Stundeninhalt</p><p className="mt-1 text-sm font-bold leading-relaxed">{nextSchedule.content||"Noch kein Inhalt eingetragen"}</p></div><div className="mt-3 grid grid-cols-2 gap-3"><div className="rounded-2xl border border-white/15 bg-white/10 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-blue-200">Verantwortlich</p><p className="mt-1 text-sm font-bold">{nextSchedule.responsible||"Offen"}</p></div><div className="rounded-2xl border border-white/15 bg-white/10 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-blue-200">Segensgebet</p><p className="mt-1 text-sm font-bold">{preacherName(nextEvent.date)}</p></div></div><div className="mt-4 grid gap-2 sm:grid-cols-2"><button onClick={()=>{setDate(nextEvent.date);navigateTo("attendance")}} className="rounded-2xl bg-white px-4 py-3 font-bold text-blue-700">Anwesenheit erfassen</button><button onClick={()=>navigateTo("preachers",{resetTarget:true})} className="flex items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/10 px-4 py-3 font-bold text-white"><BookOpen size={18}/>Predigerliste öffnen</button></div></section>
         <section className="grid grid-cols-3 gap-3"><div className="rounded-3xl bg-white p-4"><b className="text-2xl">{people.length}</b><p className="text-xs text-slate-500">Teilnehmer</p></div><div className="rounded-3xl bg-white p-4"><b className="text-2xl">{pastEvents.length}</b><p className="text-xs text-slate-500">erfasste Termine</p></div><div className="rounded-3xl bg-white p-4"><b className="text-2xl text-amber-600">{missedThree.length}</b><p className="text-xs text-slate-500">3× gefehlt</p></div></section>
-        <section className="rounded-3xl bg-white p-5"><div className="flex items-center gap-2"><AlertTriangle className="text-amber-500"/><b>Letzte 3 erfasste Termine gefehlt</b></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{missedThree.map(p=><div className="rounded-2xl bg-amber-50 p-3" key={p.id}><div className="font-bold">{p.last}, {p.first}</div><div className="mt-1 text-xs text-amber-800">{p.v?<>Verantwortlicher Leiter: <b>{p.v}</b></>:<i>Kein verantwortlicher Leiter hinterlegt</i>}</div></div>)}</div></section>
+        <section className="rounded-3xl bg-white p-5"><div className="flex items-center gap-2"><AlertTriangle className="text-amber-500"/><b>Letzte 3 erfasste Termine gefehlt</b></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{missedThree.length?missedThree.map(p=><div className="rounded-2xl bg-amber-50 p-3" key={p.id}><div className="font-bold">{p.last}, {p.first}</div><div className="mt-1 text-xs text-amber-800">{p.v?<>Verantwortlicher Leiter: <b>{p.v}</b></>:<i>Kein verantwortlicher Leiter hinterlegt</i>}</div></div>):<p className="text-sm text-slate-500">Keine Personen betroffen.</p>}</div><div className="my-5 border-t border-slate-200"/><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><AlertTriangle className="text-red-500"/><b>Gesamtanwesenheit bis 50 %</b></div><span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-black text-red-700">{lowAttendancePeople.length}</span></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{lowAttendancePeople.length?lowAttendancePeople.map(({person,stats})=><div className="flex items-center justify-between gap-3 rounded-2xl bg-red-50 p-3" key={person.id}><div><div className="font-bold">{person.last}, {person.first}</div><div className="mt-1 text-xs text-red-800">{stats.attended} von {stats.total} Terminen anwesend</div></div><span className="text-lg font-black text-red-700">{stats.percent}%</span></div>):<p className="text-sm text-slate-500">Keine Personen mit 50 % oder weniger.</p>}</div></section>
       </>}
 
       {view==="attendance"&&<>
@@ -1023,6 +1043,7 @@ export default function App(){
     <button type="button" aria-label="Nach oben scrollen" onClick={scrollToTop} className={`fixed bottom-32 right-4 z-50 grid h-12 w-12 place-items-center rounded-full bg-slate-900 text-white shadow-xl transition-all duration-300 ease-out hover:-translate-y-1 hover:bg-blue-700 active:scale-90 ${showScrollTop?"translate-y-0 opacity-100":"pointer-events-none translate-y-5 opacity-0"}`}><ArrowUp size={22}/></button>
 
     <nav className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-40 rounded-3xl border bg-white/95 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl"><div className="mx-auto grid max-w-5xl grid-cols-5 items-end px-2">{nav.map(([id,label,Icon])=>{const isHome=id==="home",active=view===id;return <button key={id} onClick={()=>navigateTo(id,{resetAll:id==="home"})} className={`relative flex flex-col items-center gap-1 text-[10px] ${isHome?"-mt-5 pb-3":"py-3"} ${active?"font-black text-blue-700":"text-slate-500"}`}>{isHome?<span className={`grid h-14 w-14 place-items-center rounded-full border-4 border-white shadow-lg ${active?"bg-blue-600":"bg-slate-900"} text-white`}><Icon size={25}/></span>:<Icon size={20}/>}<span className={isHome?"font-black":""}>{label}</span></button>})}</div></nav>
+    {showPastAttendanceConfirm&&<div className="fixed inset-0 z-[70] flex items-end bg-slate-950/55 p-3 backdrop-blur-sm sm:items-center sm:justify-center"><div className="w-full rounded-[28px] bg-white p-5 shadow-2xl sm:max-w-md"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-100 text-amber-700"><AlertTriangle/></div><div><p className="text-xs font-black uppercase tracking-wider text-amber-700">Vergangener Termin</p><h3 className="text-xl font-black">Anwesenheit bearbeiten?</h3></div></div><p className="mt-4 text-sm leading-relaxed text-slate-600">Du möchtest die Anwesenheit vom <b>{fmt(date)}</b> nachträglich ändern. Für die aktuelle App-Sitzung wird die Bearbeitung vergangener Termine danach freigegeben.</p><div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={cancelPastAttendanceEdit} className="rounded-2xl bg-slate-100 py-3 font-black text-slate-700">Abbrechen</button><button type="button" onClick={confirmPastAttendanceEdit} className="rounded-2xl bg-amber-500 py-3 font-black text-slate-950">Freigeben</button></div></div></div>}
     {adding&&<AddPerson draft={draft} setDraft={setDraft} onSave={saveNew} onClose={()=>setAdding(false)}/>} 
     {addingEvent&&<AddEvent draft={eventDraft} setDraft={setEventDraft} onSave={saveNewEvent} onClose={()=>setAddingEvent(false)}/>} 
   </div>;
