@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  AlertTriangle, ArrowUp, Ban, CalendarDays, Camera, Check, CheckCircle2,
+  AlertTriangle, ArrowUp, Ban, BookOpen, CalendarDays, Camera, Check, CheckCircle2,
   ChevronLeft, ChevronRight, ClipboardList, Home,
   Pencil, Plus, Search, Trash2, Users, X
 } from "lucide-react";
@@ -11,6 +11,8 @@ const STORAGE_KEYS = {
   people: "jungschar.people.v02",
   attendance: "jungschar.attendance.v02",
   schedule: "jungschar.schedule.v023",
+  preachers: "jungschar.preachers.v01",
+  preacherRoster: "jungschar.preacherRoster.v01",
   photo: "jungschar.photo.v02"
 };
 
@@ -36,7 +38,7 @@ const personDetailsSeed = {
   },
   "3": {
     "v": "St",
-    "duty": "Kaffee&Kuchen",
+    "duty": "Kaffe&Kuchen",
     "instrument": "Klavier, Cello"
   },
   "4": {
@@ -61,7 +63,7 @@ const personDetailsSeed = {
   },
   "8": {
     "v": "Sa",
-    "duty": "Kaffee&Kuchen",
+    "duty": "Kaffe&Kuchen",
     "instrument": "Klavier, Querflöte"
   },
   "9": {
@@ -672,6 +674,9 @@ const scheduleSeed = [
   }
 ];
 
+const preacherRosterSeed = ["Akulenko Mike","Biegler Calvin","Fast Tobias","Kliwer Fynn","Marchuk Roman","Marchuk Vitali","Negura Janick","Schefer Jamian","Shyrai Arsen","Vogel Daniel","Wall Nick"];
+const preacherSeed = {"2026-08-31":{askedName:"Marchuk Vitali",preached:true},"2026-09-07":{askedName:"Marchuk Roman",preached:true},"2026-10-05":{askedName:"Fast Tobias",preached:true},"2026-10-19":{askedName:"Vogel Daniel",preached:true}};
+
 const attendanceSeed = {
   "2026-08-10":[1,6,7,8,9,10,12,14,16,17,18,20,26,27,28,29],
   "2026-08-17":[1,2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,23,27,28,29,30],
@@ -711,8 +716,28 @@ function AddPerson({draft,setDraft,onSave,onClose}){
   </div>;
 }
 
+function AddEvent({draft,setDraft,onSave,onClose}){
+  return <div className="fixed inset-0 z-50 flex items-end bg-slate-950/50 backdrop-blur-sm sm:items-center sm:justify-center">
+    <div className="max-h-[92vh] w-full overflow-auto rounded-t-[32px] bg-white p-5 sm:max-w-xl sm:rounded-[32px]">
+      <div className="flex items-start justify-between gap-3">
+        <div><p className="text-xs font-black uppercase tracking-widest text-blue-600">Termine</p><h2 className="text-2xl font-black">Termin hinzufügen</h2></div>
+        <button type="button" onClick={onClose} className="rounded-full bg-slate-100 p-2"><X/></button>
+      </div>
+      <div className="mt-5 grid gap-4">
+        <label><span className="mb-1 block text-sm font-bold text-slate-600">Datum</span><input type="date" value={draft.date} onChange={e=>setDraft({...draft,date:e.target.value})} className="w-full rounded-2xl border bg-slate-50 p-3"/></label>
+        <label><span className="mb-1 block text-sm font-bold text-slate-600">Inhalt</span><textarea rows="3" value={draft.content} onChange={e=>setDraft({...draft,content:e.target.value})} placeholder="Stundeninhalt eintragen" className="w-full resize-none rounded-2xl border bg-slate-50 p-3"/></label>
+        <label><span className="mb-1 block text-sm font-bold text-slate-600">Verantwortlich</span><input value={draft.responsible} onChange={e=>setDraft({...draft,responsible:e.target.value})} placeholder="Verantwortliche Person" className="w-full rounded-2xl border bg-slate-50 p-3"/></label>
+      </div>
+      <button type="button" disabled={!draft.date} onClick={onSave} className="mt-5 w-full rounded-2xl bg-blue-600 py-3.5 font-black text-white disabled:opacity-40">Termin speichern</button>
+    </div>
+  </div>;
+}
+
 export default function App(){
   const [view,setView]=useState("home");
+  const scrollPositions=useRef({home:0,attendance:0,people:0,events:0,overview:0,preachers:0});
+  const pendingScroll=useRef(0);
+  const swipeStartX=useRef(null);
   const [people,setPeople]=useState(() => {
     const stored=readStored(STORAGE_KEYS.people, null);
     if(!stored) return sortPeople(peopleSeed);
@@ -723,13 +748,23 @@ export default function App(){
     }));
   });
   const [attendance,setAttendance]=useState(() => readStored(STORAGE_KEYS.attendance, attendanceSeed));
-  const [events]=useState(eventsSeed);
   const [schedule,setSchedule]=useState(() => readStored(STORAGE_KEYS.schedule, scheduleSeed));
+  const [preachers,setPreachers]=useState(() => readStored(STORAGE_KEYS.preachers, preacherSeed));
+  const [preacherRoster,setPreacherRoster]=useState(() => readStored(STORAGE_KEYS.preacherRoster, preacherRosterSeed));
+  const [newPreacherName,setNewPreacherName]=useState("");
+  const events=[...new Set([...Object.keys(attendance),...schedule.map(item=>item.date)])]
+    .sort()
+    .map(eventDate=>({
+      date:eventDate,
+      cancelled:/(ferien|ausfall|passahmontag|pfingstmontag)/i.test(schedule.find(item=>item.date===eventDate)?.content||"")
+    }));
   const [date,setDate]=useState("2026-10-12");
   const [query,setQuery]=useState("");
   const [showChecked,setShowChecked]=useState(true);
   const [adding,setAdding]=useState(false);
   const [draft,setDraft]=useState(blank);
+  const [addingEvent,setAddingEvent]=useState(false);
+  const [eventDraft,setEventDraft]=useState({date:"",content:"",responsible:""});
   const [photo,setPhoto]=useState(() => readStored(STORAGE_KEYS.photo, ""));
   const [showScrollTop,setShowScrollTop]=useState(false);
   const [showVisits,setShowVisits]=useState(false);
@@ -746,6 +781,8 @@ export default function App(){
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.schedule, JSON.stringify(schedule));
   }, [schedule]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.preachers, JSON.stringify(preachers)); }, [preachers]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.preacherRoster, JSON.stringify(preacherRoster)); }, [preacherRoster]);
 
   useEffect(() => {
     try {
@@ -762,6 +799,20 @@ export default function App(){
     return ()=>window.removeEventListener("scroll",onScroll);
   },[]);
 
+  useLayoutEffect(() => {
+    window.scrollTo({top:pendingScroll.current,behavior:"auto"});
+  },[view]);
+
+  const navigateTo = (target,{resetAll=false,resetTarget=false}={}) => {
+    scrollPositions.current[view]=window.scrollY;
+    if(resetAll) scrollPositions.current={home:0,attendance:0,people:0,events:0,overview:0,preachers:0};
+    if(resetTarget) scrollPositions.current[target]=0;
+    pendingScroll.current=scrollPositions.current[target]||0;
+    setQuery("");
+    if(target===view){window.scrollTo({top:pendingScroll.current,behavior:"auto"});return;}
+    setView(target);
+  };
+
   const selectedEvent=events.find(e=>e.date===date)||events[0];
   const eventIndex=events.findIndex(e=>e.date===date);
   const present=new Set(attendance[date]||[]);
@@ -774,6 +825,10 @@ export default function App(){
   const attendancePeople=filteredPeople.filter(p=>showChecked||!present.has(p.id));
   const overviewEvents=events.filter(e=>e.date<=TODAY&&(attendance[e.date]||e.cancelled));
   const overviewPeople=sortPeople(people);
+  const nextSchedule=schedule.find(item=>item.date===nextEvent.date)||{content:"",responsible:""};
+  const preacherEvents=[...events].filter(event=>!event.cancelled);
+  const preacherDisplayEvents=[...preacherEvents.filter(event=>event.date>=TODAY),...preacherEvents.filter(event=>event.date<TODAY).reverse()];
+  const preacherName=eventDate=>preachers[eventDate]?.askedName||"Noch nicht festgelegt";
   const personStats = person => {
     const relevantEvents = pastEvents.filter(event => !person.joinDate || event.date >= person.joinDate);
     const attended = relevantEvents.filter(event => (attendance[event.date] || []).includes(person.id)).length;
@@ -801,6 +856,39 @@ export default function App(){
       : [...old,{date:eventDate,content:"",responsible:"",[key]:value}];
     return [...next].sort((a,b)=>a.date.localeCompare(b.date));
   });
+  const saveNewEvent = () => {
+    const eventDate=eventDraft.date;
+    if(!eventDate) return;
+    if(events.some(event=>event.date===eventDate)){
+      window.alert("Für dieses Datum ist bereits ein Termin vorhanden.");
+      return;
+    }
+    setSchedule(old=>[...old,{...eventDraft}].sort((a,b)=>a.date.localeCompare(b.date)));
+    setDate(eventDate);
+    setEventDraft({date:"",content:"",responsible:""});
+    setAddingEvent(false);
+  };
+  const deleteEvent = eventDate => {
+    if(!window.confirm(`${fmt(eventDate)} wirklich löschen? Der Termin und seine Anwesenheitsdaten werden entfernt.`)) return;
+    const remainingEvents=events.filter(event=>event.date!==eventDate);
+    setSchedule(old=>old.filter(item=>item.date!==eventDate));
+    setAttendance(old=>Object.fromEntries(Object.entries(old).filter(([storedDate])=>storedDate!==eventDate)));
+    if(date===eventDate){
+      const replacement=remainingEvents.find(event=>event.date>=TODAY&&!event.cancelled)||remainingEvents.at(-1);
+      if(replacement) setDate(replacement.date);
+    }
+  };
+  const handleTouchStart = event => { swipeStartX.current=event.touches[0]?.clientX??null; };
+  const handleTouchEnd = (event,eventDate) => {
+    if(swipeStartX.current===null) return;
+    const endX=event.changedTouches[0]?.clientX??swipeStartX.current;
+    const distance=endX-swipeStartX.current;
+    swipeStartX.current=null;
+    if(distance < -70) deleteEvent(eventDate);
+  };
+  const updatePreacherAssignment=(eventDate,changes)=>setPreachers(old=>({...old,[eventDate]:{askedName:"",preached:false,...old[eventDate],...changes}}));
+  const addPreacher=()=>{const name=newPreacherName.trim();if(!name)return;if(preacherRoster.some(item=>item.toLowerCase()===name.toLowerCase())){window.alert("Diese Person ist bereits in der Predigerliste.");return;}setPreacherRoster(old=>[...old,name].sort((a,b)=>a.localeCompare(b,"de")));setNewPreacherName("");};
+  const removePreacher=name=>{if(!window.confirm(`${name} wirklich aus der Predigerliste entfernen? Bereits gespeicherte Termine bleiben erhalten.`))return;setPreacherRoster(old=>old.filter(item=>item!==name));};
   const isVisitContent = content => /alten[- ]?\/?\s*und\s*krankenbesuch|alten-\s*und\s*krankenbesuch|altenbesuch|krankenbesuch/i.test(content);
   const extractVisited = content => {
     const bracketMatch=content.match(/\(([^)]+)\)/);
@@ -816,7 +904,7 @@ export default function App(){
   };
   const nav=[["attendance","Anwesenheit",CheckCircle2],["people","Teilnehmer",Users],["home","Start",Home],["events","Termine",CalendarDays],["overview","Übersicht",ClipboardList]];
 
-  return <div className="min-h-screen bg-[#f3f6fb] pb-28 text-slate-900">
+  return <div className="min-h-screen bg-[#f3f6fb] pb-40 text-slate-900">
     <main className="mx-auto max-w-5xl space-y-4 p-4">
       {view!=="home"&&<header><p className="text-xs font-black uppercase tracking-[.2em] text-blue-600">Jungschar-App</p><h1 className="text-3xl font-black">Jungschar 2012</h1><p className="text-sm text-slate-500">Datenstand bis 15.10.2026</p></header>}
 
@@ -832,17 +920,11 @@ export default function App(){
             </label>
           </div>
           <div className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-7">
-            <p className="text-xs font-black uppercase tracking-[.22em] text-blue-200">Jungschar 2012</p>
-            <h1 className="mt-1 text-4xl font-black leading-none drop-shadow-lg sm:text-5xl">Jungschar 2012</h1>
-            <p className="mt-2 text-sm font-bold text-white/90">2026 / 2027 · Datenstand 15.10.2026</p>
-            <div className="mt-4 rounded-2xl border border-white/20 bg-slate-950/45 p-3 backdrop-blur-md">
-              <p className="text-[10px] font-black uppercase tracking-[.18em] text-blue-200">Jungscharleiter</p>
-              <p className="mt-1 text-sm font-bold leading-relaxed">Samuel Kliwer · Davis Kliwer · Stephan Domanski · Julien Vogel</p>
-            </div>
+            <h1 className="text-4xl font-black leading-none drop-shadow-lg sm:text-5xl">Jungschar 2012</h1><p className="mt-2 text-lg font-bold text-blue-100 drop-shadow-md sm:text-xl">Die beste Gruppe</p><div className="mt-4 rounded-2xl border border-white/20 bg-slate-950/50 p-3 backdrop-blur-md sm:p-4"><p className="text-[10px] font-black uppercase tracking-[.18em] text-blue-200">Jungscharleiter</p><div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs font-bold leading-tight sm:flex sm:flex-wrap sm:gap-2 sm:text-sm"><span>Samuel Kliwer</span><span>Davis Kliwer</span><span>Stephan Domanski</span><span>Julien Vogel</span></div></div>
             {photo&&<button type="button" onClick={resetPhoto} className="mt-3 text-xs font-bold text-white/80 underline underline-offset-4">Standardbild wiederherstellen</button>}
           </div>
         </section>
-        <section className="rounded-[34px] bg-gradient-to-br from-blue-700 to-indigo-950 p-6 text-white shadow-xl"><p className="text-sm text-blue-200">Nächster Termin</p><h2 className="mt-1 text-3xl font-black">{fmt(nextEvent.date)}</h2><button onClick={()=>{setDate(nextEvent.date);setView("attendance")}} className="mt-5 rounded-2xl bg-white px-4 py-3 font-bold text-blue-700">Anwesenheit erfassen</button></section>
+        <section className="rounded-[34px] bg-gradient-to-br from-blue-700 to-indigo-950 p-6 text-white shadow-xl"><p className="text-sm text-blue-200">Nächster Termin</p><h2 className="mt-1 text-3xl font-black">{fmt(nextEvent.date)}</h2><div className="mt-4 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm"><p className="text-[10px] font-black uppercase tracking-wider text-blue-200">Stundeninhalt</p><p className="mt-1 text-sm font-bold leading-relaxed">{nextSchedule.content||"Noch kein Inhalt eingetragen"}</p></div><div className="mt-3 grid grid-cols-2 gap-3"><div className="rounded-2xl border border-white/15 bg-white/10 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-blue-200">Verantwortlich</p><p className="mt-1 text-sm font-bold">{nextSchedule.responsible||"Offen"}</p></div><div className="rounded-2xl border border-white/15 bg-white/10 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-blue-200">Segensgebet</p><p className="mt-1 text-sm font-bold">{preacherName(nextEvent.date)}</p></div></div><div className="mt-4 grid gap-2 sm:grid-cols-2"><button onClick={()=>{setDate(nextEvent.date);navigateTo("attendance")}} className="rounded-2xl bg-white px-4 py-3 font-bold text-blue-700">Anwesenheit erfassen</button><button onClick={()=>navigateTo("preachers",{resetTarget:true})} className="flex items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/10 px-4 py-3 font-bold text-white"><BookOpen size={18}/>Predigerliste öffnen</button></div></section>
         <section className="grid grid-cols-3 gap-3"><div className="rounded-3xl bg-white p-4"><b className="text-2xl">{people.length}</b><p className="text-xs text-slate-500">Teilnehmer</p></div><div className="rounded-3xl bg-white p-4"><b className="text-2xl">{pastEvents.length}</b><p className="text-xs text-slate-500">erfasste Termine</p></div><div className="rounded-3xl bg-white p-4"><b className="text-2xl text-amber-600">{missedThree.length}</b><p className="text-xs text-slate-500">3× gefehlt</p></div></section>
         <section className="rounded-3xl bg-white p-5"><div className="flex items-center gap-2"><AlertTriangle className="text-amber-500"/><b>Letzte 3 erfasste Termine gefehlt</b></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{missedThree.map(p=><div className="rounded-2xl bg-amber-50 p-3" key={p.id}><div className="font-bold">{p.last}, {p.first}</div><div className="mt-1 text-xs text-amber-800">{p.v?<>Verantwortlicher Leiter: <b>{p.v}</b></>:<i>Kein verantwortlicher Leiter hinterlegt</i>}</div></div>)}</div></section>
       </>}
@@ -931,14 +1013,17 @@ export default function App(){
         </section>
       </>}
 
-      {view==="events"&&<><div className="flex items-start justify-between gap-3"><div><h2 className="text-2xl font-black">Termine</h2><p className="text-sm text-slate-500">Stundeninhalte 2026/27 und 2027/28 · Änderungen werden lokal gespeichert</p></div><div className="flex shrink-0 flex-col gap-2"><button type="button" onClick={scrollToNextEvent} className="rounded-2xl bg-blue-600 px-4 py-3 text-xs font-black text-white shadow-lg transition duration-300 hover:-translate-y-0.5 hover:bg-blue-700 active:scale-95">Nächster Termin</button><button type="button" onClick={()=>setShowVisits(value=>!value)} className="rounded-2xl bg-teal-700 px-4 py-3 text-xs font-black text-white shadow-lg transition duration-300 hover:-translate-y-0.5 hover:bg-teal-800 active:scale-95">{showVisits?"Auswertung schließen":"Besuche auswerten"}</button></div></div>{showVisits&&<section className="rounded-3xl border border-teal-200 bg-teal-50 p-5 shadow-sm"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-widest text-teal-700">Auswertung</p><h3 className="text-xl font-black text-teal-950">Alten- und Krankenbesuche</h3></div><span className="rounded-full bg-teal-700 px-3 py-1 text-xs font-black text-white">{visitEvents.length} Termine</span></div><div className="mt-4 grid gap-3">{visitEvents.length?visitEvents.map(item=><article key={item.date} className="rounded-2xl bg-white p-4"><b className="text-teal-950">{fmt(item.date)}</b><p className="mt-1 text-sm font-bold text-teal-800">Besucht: {extractVisited(item.content)||"nicht angegeben"}</p>{item.responsible&&<p className="mt-1 text-xs text-slate-500">Verantwortlich: <b>{item.responsible}</b></p>}<p className="mt-2 text-xs text-slate-500">{item.content}</p></article>):<p className="text-sm text-teal-900">Keine Alten- oder Krankenbesuche eingetragen.</p>}</div></section>}<section className="grid gap-3">{events.filter(e=>e.date>="2026-08-10"&&e.date<="2028-05-22").map(e=>{const plan=scheduleFor(e.date);const normalizedContent=plan.content.trim().toLowerCase();const isTheme=normalizedContent.startsWith("thema:")||normalizedContent.startsWith("themenreihe:");const isVisit=isVisitContent(plan.content);const isCancellation=e.cancelled||/(ferien|ausfall|passahmontag|pfingstmontag)/i.test(plan.content);return <article id={`event-${e.date}`} key={e.date} className={`scroll-mt-4 rounded-3xl p-4 shadow-sm transition duration-300 ${e.date===nextEvent.date?"border-2 border-blue-500 bg-blue-50/50":isVisit?"border-2 border-teal-400 bg-teal-50/60":"bg-white"}`}><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><b>{fmt(e.date)}</b>{e.date===nextEvent.date&&<span className="rounded-full bg-blue-600 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white">Nächster Termin</span>}</div><p className={`mt-1 text-xs font-bold ${isCancellation?"italic text-red-600":attendance[e.date]?"text-emerald-700":"text-slate-500"}`}>{attendance[e.date]?`${attendance[e.date].length} anwesend`:isCancellation?"Ausfall / Ferien":"noch nicht erfasst"}</p></div><button type="button" onClick={()=>{setDate(e.date);setView("attendance")}} className="flex shrink-0 items-center gap-1 rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition duration-300 hover:bg-blue-100 active:scale-95">Anwesenheit<ChevronRight size={15}/></button></div><label className={`mt-4 block rounded-2xl p-3 transition duration-300 ${isVisit?"border border-teal-300 bg-teal-50 shadow-sm":isTheme?"border border-amber-300 bg-amber-50 shadow-sm":""}`}><span className={`mb-1 block text-[10px] font-black uppercase tracking-wider ${isVisit?"text-teal-700":isTheme?"text-amber-700":"text-slate-500"}`}>{isVisit?"Alten- und Krankenbesuch":isTheme?"Thema / Themenreihe":"Inhalt"}</span><textarea rows="2" value={plan.content} onChange={event=>updateSchedule(e.date,"content",event.target.value)} placeholder="Inhalt eintragen" className={`w-full resize-none rounded-xl border p-3 text-sm outline-none focus:border-blue-400 ${isCancellation?"italic":""} ${isVisit?"border-teal-200 bg-white font-bold text-teal-950":isTheme?"border-amber-200 bg-white font-bold text-amber-950":"border-slate-200 bg-slate-50 focus:bg-white"}`}/></label><label className="mt-3 block"><span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500">Verantwortlich</span><input value={plan.responsible} onChange={event=>updateSchedule(e.date,"responsible",event.target.value)} placeholder="Verantwortliche Person eintragen" className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-blue-400 focus:bg-white"/></label></article>})}</section></>}
+      {view==="preachers"&&<><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-widest text-blue-600">Planung</p><h2 className="text-2xl font-black">Predigerliste</h2><p className="text-sm text-slate-500">Eigenständige Liste, unabhängig von Teilnehmern</p></div><button type="button" onClick={()=>navigateTo("home")} className="rounded-2xl bg-slate-900 px-4 py-3 text-xs font-black text-white">Zur Startseite</button></div><section className="rounded-3xl bg-white p-4 shadow-sm"><h3 className="font-black">Prediger verwalten</h3><div className="mt-3 flex gap-2"><input value={newPreacherName} onChange={e=>setNewPreacherName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")addPreacher()}} placeholder="Name hinzufügen" className="min-w-0 flex-1 rounded-2xl border bg-slate-50 p-3"/><button type="button" onClick={addPreacher} className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-600 text-white"><Plus/></button></div><div className="mt-3 flex flex-wrap gap-2">{preacherRoster.map(name=><span key={name} className="flex items-center gap-2 rounded-full bg-slate-100 py-1 pl-3 pr-1 text-xs font-bold">{name}<button type="button" onClick={()=>removePreacher(name)} className="grid h-6 w-6 place-items-center rounded-full bg-red-100 text-red-700"><X size={13}/></button></span>)}</div></section><section className="grid gap-3">{preacherDisplayEvents.map(event=>{const assignment=preachers[event.date]||{askedName:"",preached:false};const isNext=event.date===nextEvent.date;const isPast=event.date<TODAY;const options=assignment.askedName&&!preacherRoster.includes(assignment.askedName)?[assignment.askedName,...preacherRoster]:preacherRoster;return <article key={event.date} className={`rounded-3xl p-4 shadow-sm ${isNext?"border-2 border-blue-500 bg-blue-50":"bg-white"}`}><div className="flex items-center justify-between gap-3"><div><b>{fmt(event.date)}</b>{isNext&&<span className="ml-2 rounded-full bg-blue-600 px-2 py-1 text-[10px] font-black uppercase text-white">Nächster Termin</span>}</div>{assignment.preached&&<span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-800">Gepredigt</span>}</div><label className="mt-4 block"><span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500">Gefragt wurde</span><select value={assignment.askedName||""} onChange={e=>updatePreacherAssignment(event.date,{askedName:e.target.value,preached:false})} className="w-full rounded-2xl border bg-slate-50 p-3 text-sm"><option value="">Noch niemand festgelegt</option>{options.map(name=><option key={name} value={name}>{name}</option>)}</select></label><label className={`mt-3 flex items-center gap-3 rounded-2xl border p-3 ${assignment.askedName?"cursor-pointer bg-white":"cursor-not-allowed bg-slate-50 opacity-50"}`}><input type="checkbox" disabled={!assignment.askedName} checked={!!assignment.preached} onChange={e=>updatePreacherAssignment(event.date,{preached:e.target.checked})} className="h-5 w-5 accent-emerald-600"/><span className="text-sm font-bold">{isPast?"Hat tatsächlich gepredigt":"Nach dem Termin als gepredigt bestätigen"}</span></label></article>})}</section></>}
+
+      {view==="events"&&<><div className="flex items-start justify-between gap-3"><div><h2 className="text-2xl font-black">Termine</h2><p className="text-sm text-slate-500">Stundeninhalte 2026/27 und 2027/28 · Änderungen werden lokal gespeichert</p></div><div className="flex shrink-0 flex-col gap-2"><button type="button" onClick={()=>{setEventDraft({date:"",content:"",responsible:""});setAddingEvent(true)}} className="flex items-center justify-center gap-1 rounded-2xl bg-slate-900 px-4 py-3 text-xs font-black text-white shadow-lg active:scale-95"><Plus size={15}/>Termin</button><button type="button" onClick={scrollToNextEvent} className="rounded-2xl bg-blue-600 px-4 py-3 text-xs font-black text-white shadow-lg transition duration-300 hover:-translate-y-0.5 hover:bg-blue-700 active:scale-95">Nächster Termin</button><button type="button" onClick={()=>setShowVisits(value=>!value)} className="rounded-2xl bg-teal-700 px-4 py-3 text-xs font-black text-white shadow-lg transition duration-300 hover:-translate-y-0.5 hover:bg-teal-800 active:scale-95">{showVisits?"Auswertung schließen":"Besuche auswerten"}</button></div></div>{showVisits&&<section className="rounded-3xl border border-teal-200 bg-teal-50 p-5 shadow-sm"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-widest text-teal-700">Auswertung</p><h3 className="text-xl font-black text-teal-950">Alten- und Krankenbesuche</h3></div><span className="rounded-full bg-teal-700 px-3 py-1 text-xs font-black text-white">{visitEvents.length} Termine</span></div><div className="mt-4 grid gap-3">{visitEvents.length?visitEvents.map(item=><article key={item.date} className="rounded-2xl bg-white p-4"><b className="text-teal-950">{fmt(item.date)}</b><p className="mt-1 text-sm font-bold text-teal-800">Besucht: {extractVisited(item.content)||"nicht angegeben"}</p>{item.responsible&&<p className="mt-1 text-xs text-slate-500">Verantwortlich: <b>{item.responsible}</b></p>}<p className="mt-2 text-xs text-slate-500">{item.content}</p></article>):<p className="text-sm text-teal-900">Keine Alten- oder Krankenbesuche eingetragen.</p>}</div></section>}<section className="grid gap-3">{events.map(e=>{const plan=scheduleFor(e.date);const normalizedContent=plan.content.trim().toLowerCase();const isTheme=normalizedContent.startsWith("thema:")||normalizedContent.startsWith("themenreihe:");const isVisit=isVisitContent(plan.content);const isCancellation=e.cancelled||/(ferien|ausfall|passahmontag|pfingstmontag)/i.test(plan.content);return <article id={`event-${e.date}`} key={e.date} onTouchStart={handleTouchStart} onTouchEnd={event=>handleTouchEnd(event,e.date)} className={`touch-pan-y scroll-mt-4 rounded-3xl p-4 shadow-sm transition duration-300 ${e.date===nextEvent.date?"border-2 border-blue-500 bg-blue-50/50":isVisit?"border-2 border-teal-400 bg-teal-50/60":"bg-white"}`}><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><b>{fmt(e.date)}</b>{e.date===nextEvent.date&&<span className="rounded-full bg-blue-600 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white">Nächster Termin</span>}</div><p className={`mt-1 text-xs font-bold ${isCancellation?"italic text-red-600":attendance[e.date]?"text-emerald-700":"text-slate-500"}`}>{attendance[e.date]?`${attendance[e.date].length} anwesend`:isCancellation?"Ausfall / Ferien":"noch nicht erfasst"}</p></div><button type="button" onClick={()=>{setDate(e.date);navigateTo("attendance")}} className="flex shrink-0 items-center gap-1 rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition duration-300 hover:bg-blue-100 active:scale-95">Anwesenheit<ChevronRight size={15}/></button></div><label className={`mt-4 block rounded-2xl p-3 transition duration-300 ${isVisit?"border border-teal-300 bg-teal-50 shadow-sm":isTheme?"border border-amber-300 bg-amber-50 shadow-sm":""}`}><span className={`mb-1 block text-[10px] font-black uppercase tracking-wider ${isVisit?"text-teal-700":isTheme?"text-amber-700":"text-slate-500"}`}>{isVisit?"Alten- und Krankenbesuch":isTheme?"Thema / Themenreihe":"Inhalt"}</span><textarea rows="2" value={plan.content} onChange={event=>updateSchedule(e.date,"content",event.target.value)} placeholder="Inhalt eintragen" className={`w-full resize-none rounded-xl border p-3 text-sm outline-none focus:border-blue-400 ${isCancellation?"italic":""} ${isVisit?"border-teal-200 bg-white font-bold text-teal-950":isTheme?"border-amber-200 bg-white font-bold text-amber-950":"border-slate-200 bg-slate-50 focus:bg-white"}`}/></label><label className="mt-3 block"><span className="mb-1 block text-[10px] font-black uppercase tracking-wider text-slate-500">Verantwortlich</span><input value={plan.responsible} onChange={event=>updateSchedule(e.date,"responsible",event.target.value)} placeholder="Verantwortliche Person eintragen" className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-blue-400 focus:bg-white"/></label><p className="mt-3 text-right text-[10px] font-bold text-slate-400">Zum Löschen nach links wischen</p></article>})}</section></>}
 
       {view==="overview"&&<><div><h2 className="text-2xl font-black">Gesamtübersicht</h2><p className="text-sm text-slate-500">Alle erfassten Anwesenheiten · horizontal wischen</p></div><section className="overflow-hidden rounded-3xl bg-white shadow-sm"><div className="overflow-x-auto"><table className="min-w-max border-collapse text-xs"><thead><tr className="bg-slate-900 text-white"><th className="sticky left-0 z-20 w-10 border-r border-slate-700 bg-slate-900 px-2 py-3">Nr.</th><th className="sticky left-10 z-20 min-w-40 border-r border-slate-700 bg-slate-900 px-3 py-3 text-left">Name</th>{overviewEvents.map(e=><th key={e.date} className={`min-w-16 border-r border-slate-700 px-2 py-2 ${e.cancelled?"bg-red-800":""}`}><span className="block">{shortDate(e.date)}</span><span className="text-[10px] font-normal opacity-70">{e.cancelled?"Ausfall":fmt(e.date).slice(0,2)}</span></th>)}</tr></thead><tbody>{overviewPeople.map((p,index)=><tr key={p.id} className={index%2?"bg-slate-50":"bg-white"}><td className={`sticky left-0 z-10 border-b border-r px-2 py-2 text-center font-bold ${index%2?"bg-slate-50":"bg-white"}`}>{index+1}</td><td className={`sticky left-10 z-10 border-b border-r px-3 py-2 font-semibold ${index%2?"bg-slate-50":"bg-white"}`}>{p.last}, {p.first}</td>{overviewEvents.map(e=>{const checked=(attendance[e.date]||[]).includes(p.id);return <td key={e.date} className={`border-b border-r px-2 py-2 text-center ${e.cancelled?"bg-red-50":""}`}>{e.cancelled?"–":checked?<span className="inline-grid h-6 w-6 place-items-center rounded-md bg-emerald-600 font-black text-white">X</span>:<span className="text-slate-300">·</span>}</td>})}</tr>)}</tbody><tfoot><tr className="bg-blue-50 font-black"><td className="sticky left-0 bg-blue-50"></td><td className="sticky left-10 border-r bg-blue-50 px-3 py-3">Anwesend</td>{overviewEvents.map(e=><td key={e.date} className="border-r px-2 py-3 text-center">{e.cancelled?"–":(attendance[e.date]||[]).length}</td>)}</tr></tfoot></table></div></section><div className="rounded-2xl bg-blue-50 p-3 text-xs text-blue-800"><b>Screenshot-Tipp:</b> Handy quer halten und zum gewünschten Zeitraum wischen.</div></>}
     </main>
 
-    <button type="button" aria-label="Nach oben scrollen" onClick={scrollToTop} className={`fixed bottom-24 right-4 z-50 grid h-12 w-12 place-items-center rounded-full bg-slate-900 text-white shadow-xl transition-all duration-300 ease-out hover:-translate-y-1 hover:bg-blue-700 active:scale-90 ${showScrollTop?"translate-y-0 opacity-100":"pointer-events-none translate-y-5 opacity-0"}`}><ArrowUp size={22}/></button>
+    <button type="button" aria-label="Nach oben scrollen" onClick={scrollToTop} className={`fixed bottom-32 right-4 z-50 grid h-12 w-12 place-items-center rounded-full bg-slate-900 text-white shadow-xl transition-all duration-300 ease-out hover:-translate-y-1 hover:bg-blue-700 active:scale-90 ${showScrollTop?"translate-y-0 opacity-100":"pointer-events-none translate-y-5 opacity-0"}`}><ArrowUp size={22}/></button>
 
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl"><div className="mx-auto grid max-w-5xl grid-cols-5 items-end px-2">{nav.map(([id,label,Icon])=>{const isHome=id==="home",active=view===id;return <button key={id} onClick={()=>{setView(id);setQuery("")}} className={`relative flex flex-col items-center gap-1 text-[10px] ${isHome?"-mt-5 pb-3":"py-3"} ${active?"font-black text-blue-700":"text-slate-500"}`}>{isHome?<span className={`grid h-14 w-14 place-items-center rounded-full border-4 border-white shadow-lg ${active?"bg-blue-600":"bg-slate-900"} text-white`}><Icon size={25}/></span>:<Icon size={20}/>}<span className={isHome?"font-black":""}>{label}</span></button>})}</div></nav>
+    <nav className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-40 rounded-3xl border bg-white/95 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl"><div className="mx-auto grid max-w-5xl grid-cols-5 items-end px-2">{nav.map(([id,label,Icon])=>{const isHome=id==="home",active=view===id;return <button key={id} onClick={()=>navigateTo(id,{resetAll:id==="home"})} className={`relative flex flex-col items-center gap-1 text-[10px] ${isHome?"-mt-5 pb-3":"py-3"} ${active?"font-black text-blue-700":"text-slate-500"}`}>{isHome?<span className={`grid h-14 w-14 place-items-center rounded-full border-4 border-white shadow-lg ${active?"bg-blue-600":"bg-slate-900"} text-white`}><Icon size={25}/></span>:<Icon size={20}/>}<span className={isHome?"font-black":""}>{label}</span></button>})}</div></nav>
     {adding&&<AddPerson draft={draft} setDraft={setDraft} onSave={saveNew} onClose={()=>setAdding(false)}/>} 
+    {addingEvent&&<AddEvent draft={eventDraft} setDraft={setEventDraft} onSave={saveNewEvent} onClose={()=>setAddingEvent(false)}/>} 
   </div>;
 }
