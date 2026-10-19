@@ -1,8 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   AlertTriangle, ArrowUp, Ban, BookOpen, CalendarDays, Camera, Cake, Check, CheckCircle2,
-  ChevronLeft, ChevronRight, ClipboardList, Home,
-  Pencil, Plus, Search, Trash2, Users, X
+  ChevronLeft, ChevronRight, ClipboardList, Download, Home,
+  Pencil, Plus, Search, ShieldCheck, Trash2, Upload, Users, X
 } from "lucide-react";
 import defaultGroupPhoto from "./assets/04_Jungschar-2012.jpg";
 
@@ -1091,6 +1091,46 @@ export default function App(){
       target?.scrollIntoView({behavior:"smooth",block:"start"});
     },80);
   };
+  const exportBackup=()=>{
+    const storage={};
+    for(let index=0;index<localStorage.length;index+=1){
+      const key=localStorage.key(index);
+      if(key?.startsWith("jungschar.")) storage[key]=localStorage.getItem(key);
+    }
+    const backup={app:"Jungschar 2012",formatVersion:1,exportedAt:new Date().toISOString(),storage};
+    const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;
+    link.download=`Jungschar-Backup-${new Date().toLocaleDateString("en-CA")}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  const importBackup=event=>{
+    const file=event.target.files?.[0];
+    event.target.value="";
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const backup=JSON.parse(String(reader.result));
+        if(backup?.app!=="Jungschar 2012"||!backup.storage||typeof backup.storage!=="object") throw new Error("Ungültiges Backup");
+        const keys=Object.keys(backup.storage).filter(key=>key.startsWith("jungschar."));
+        if(!keys.length) throw new Error("Keine App-Daten gefunden");
+        const backupDate=backup.exportedAt?new Date(backup.exportedAt).toLocaleString("de-DE"):"unbekannten Zeitpunkt";
+        if(!window.confirm(`Backup vom ${backupDate} wiederherstellen? Die aktuellen lokalen App-Daten werden ersetzt.`)) return;
+        Object.keys(localStorage).filter(key=>key.startsWith("jungschar.")).forEach(key=>localStorage.removeItem(key));
+        keys.forEach(key=>{if(typeof backup.storage[key]==="string") localStorage.setItem(key,backup.storage[key]);});
+        window.alert("Backup wurde wiederhergestellt. Die App wird jetzt neu geladen.");
+        window.location.reload();
+      }catch{
+        window.alert("Diese Datei ist kein gültiges Jungschar-App-Backup.");
+      }
+    };
+    reader.readAsText(file);
+  };
   const nav=[["attendance","Anwesenheit",CheckCircle2],["people","Teilnehmer",Users],["home","Start",Home],["events","Termine",CalendarDays],["overview","Übersicht",ClipboardList]];
 
   return <div className="min-h-screen bg-[#f3f6fb] pb-40 text-slate-900">
@@ -1117,6 +1157,17 @@ export default function App(){
         <section className="rounded-3xl border border-pink-200 bg-gradient-to-br from-pink-50 to-amber-50 p-5 shadow-sm"><div className="flex items-start gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-pink-500 text-white"><Cake size={22}/></div><div className="min-w-0 flex-1"><p className="text-[10px] font-black uppercase tracking-widest text-pink-700">Geburtstag bei nächster Gruppenstunde</p><h3 className="mt-1 text-lg font-black">{birthdaysForNextEvent.length?birthdaysForNextEvent.join(", "):"Niemand hat Geburtstag."}</h3><p className="mt-1 text-xs text-slate-600">Nächster Termin: {shortDate(nextEvent.date)}</p><button type="button" onClick={()=>setShowBirthdayList(v=>!v)} className="mt-3 inline-flex items-center gap-1 rounded-xl bg-white/80 px-3 py-2 text-xs font-black text-pink-700 shadow-sm ring-1 ring-pink-200">{showBirthdayList?"Geburtstagsliste schließen":"Alle Geburtstage anzeigen"}<ChevronRight size={14} className={showBirthdayList?"rotate-90":""}/></button></div></div>{showBirthdayList&&<div className="mt-4 border-t border-pink-200 pt-4"><div className="mb-2 text-xs font-black uppercase tracking-wider text-pink-700">Alle Geburtstage</div><div className="grid gap-2 sm:grid-cols-2">{allBirthdays.map(item=><div key={`${item.type}-${item.name}`} className="flex items-center justify-between gap-3 rounded-2xl bg-white/85 p-3"><div><div className="font-bold">{item.name}</div><div className="text-[10px] font-black uppercase tracking-wider text-slate-400">{item.type}</div></div><span className="shrink-0 rounded-full bg-pink-100 px-2.5 py-1 text-xs font-black text-pink-700">{item.birthday}</span></div>)}</div></div>}</section>
           <section className="grid grid-cols-3 gap-3"><div className="rounded-3xl bg-white p-4"><b className="text-2xl">{people.length}</b><p className="text-xs text-slate-500">Teilnehmer</p></div><div className="rounded-3xl bg-white p-4"><b className="text-2xl">{pastEvents.length}</b><p className="text-xs text-slate-500">erfasste Termine</p></div><div className="rounded-3xl bg-white p-4"><b className="text-2xl text-amber-600">{missedThree.length}</b><p className="text-xs text-slate-500">3× gefehlt</p></div></section>
         <section className="rounded-3xl bg-white p-5"><div className="flex items-center gap-2"><AlertTriangle className="text-amber-500"/><b>Letzte 3 erfasste Termine gefehlt</b></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{missedThree.length?missedThree.map(p=><div className="rounded-2xl bg-amber-50 p-3" key={p.id}><div className="font-bold">{p.last}, {p.first}</div><div className="mt-1 text-xs text-amber-800">{p.v?<>Verantwortlicher Leiter: <b>{p.v}</b></>:<i>Kein verantwortlicher Leiter hinterlegt</i>}</div></div>):<p className="text-sm text-slate-500">Keine Personen betroffen.</p>}</div><div className="my-5 border-t border-slate-200"/><button type="button" onClick={()=>setShowLowAttendance(value=>!value)} className="flex w-full items-center justify-between gap-3 rounded-2xl bg-red-50 px-3 py-3 text-left"><div className="flex items-center gap-2"><AlertTriangle className="text-red-500"/><b>Gesamtanwesenheit bis 50 %</b></div><div className="flex items-center gap-2"><span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-black text-red-700">{lowAttendancePeople.length}</span><ChevronRight size={18} className={`text-red-600 transition-transform ${showLowAttendance?"rotate-90":""}`}/></div></button>{showLowAttendance&&<div className="mt-3 grid gap-2 sm:grid-cols-2">{lowAttendancePeople.length?lowAttendancePeople.map(({person,stats})=><div className="flex items-center justify-between gap-3 rounded-2xl bg-red-50 p-3" key={person.id}><div><div className="font-bold">{person.last}, {person.first}</div><div className="mt-1 text-xs text-red-800">{stats.attended} von {stats.total} Terminen anwesend</div></div><span className="text-lg font-black text-red-700">{stats.percent}%</span></div>):<p className="text-sm text-slate-500">Keine Personen mit 50 % oder weniger.</p>}</div>}</section>
+        <section className="rounded-3xl border border-blue-100 bg-white p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-100 text-blue-700"><ShieldCheck size={22}/></div>
+            <div><h3 className="font-black">Datensicherung</h3><p className="mt-1 text-xs leading-relaxed text-slate-500">Sichert Teilnehmer, Anwesenheiten, Termine, Predigerliste, Geburtstage, Einstellungen und das ausgewählte Titelbild.</p></div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button type="button" onClick={exportBackup} className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-3 py-3 text-sm font-black text-white active:scale-[.98]"><Download size={18}/>Backup sichern</button>
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-900 px-3 py-3 text-sm font-black text-white active:scale-[.98]"><Upload size={18}/>Backup laden<input type="file" accept="application/json,.json" onChange={importBackup} className="hidden"/></label>
+          </div>
+          <p className="mt-3 text-[10px] font-bold text-slate-400">Vor einem App-Update zuerst „Backup sichern“ verwenden.</p>
+        </section>
       </>}
 
       {view==="attendance"&&<>
