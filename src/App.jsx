@@ -1074,8 +1074,13 @@ export default function App(){
   const eventSchoolYearGroups=schoolYears.map(year=>({year,items:events.filter(item=>schoolYearFor(item.date)===year)}));
   const scrollToTop=()=>window.scrollTo({top:0,behavior:"smooth"});
   const scrollToNextEvent=()=>{
-    const target=document.getElementById(`event-${nextEvent.date}`);
-    target?.scrollIntoView({behavior:"smooth",block:"start"});
+    if(!nextEvent) return;
+    const targetSchoolYear=schoolYearFor(nextEvent.date);
+    setOpenEventSchoolYear(targetSchoolYear);
+    window.setTimeout(()=>{
+      const target=document.getElementById(`event-${nextEvent.date}`);
+      target?.scrollIntoView({behavior:"smooth",block:"start"});
+    },80);
   };
   const nav=[["attendance","Anwesenheit",CheckCircle2],["people","Teilnehmer",Users],["home","Start",Home],["events","Termine",CalendarDays],["overview","Übersicht",ClipboardList]];
 
