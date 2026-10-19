@@ -10,7 +10,7 @@ const TODAY = "2026-10-15";
 const STORAGE_KEYS = {
   people: "jungschar.people.v02",
   attendance: "jungschar.attendance.v02",
-  confirmedAttendance: "jungschar.confirmedAttendance.v01",
+  confirmedAttendance: "jungschar.confirmedAttendance.v02",
   schedule: "jungschar.schedule.v023",
   preachers: "jungschar.preachers.v01",
   preacherRoster: "jungschar.preacherRoster.v01",
@@ -855,10 +855,7 @@ export default function App(){
     }));
   });
   const [attendance,setAttendance]=useState(() => readStored(STORAGE_KEYS.attendance, attendanceSeed));
-  const [confirmedAttendance,setConfirmedAttendance]=useState(() => {
-    const stored=readStored(STORAGE_KEYS.confirmedAttendance, null);
-    return stored||Object.keys(readStored(STORAGE_KEYS.attendance, attendanceSeed));
-  });
+  const [confirmedAttendance,setConfirmedAttendance]=useState(() => readStored(STORAGE_KEYS.confirmedAttendance,Object.keys(readStored(STORAGE_KEYS.attendance,attendanceSeed))));
   const [attendanceDraft,setAttendanceDraft]=useState([]);
   const [attendanceSavedNotice,setAttendanceSavedNotice]=useState(false);
   const [schedule,setSchedule]=useState(() => {const stored=readStored(STORAGE_KEYS.schedule, []);const merged=new Map(scheduleSeed.map(item=>[item.date,item]));stored.forEach(item=>merged.set(item.date,item));return [...merged.values()].sort((a,b)=>a.date.localeCompare(b.date));});
@@ -902,13 +899,8 @@ export default function App(){
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.attendance, JSON.stringify(attendance));
   }, [attendance]);
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.confirmedAttendance, JSON.stringify(confirmedAttendance));
-  }, [confirmedAttendance]);
-  useEffect(() => {
-    setAttendanceDraft([...(attendance[date]||[])]);
-    setAttendanceSavedNotice(false);
-  }, [date]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.confirmedAttendance,JSON.stringify(confirmedAttendance)); },[confirmedAttendance]);
+  useEffect(() => { setAttendanceDraft([...(attendance[date]||[])]); setAttendanceSavedNotice(false); },[date]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.schedule, JSON.stringify(schedule));
@@ -963,8 +955,11 @@ export default function App(){
   const selectedEvent=events.find(e=>e.date===date)||events[0];
   const eventIndex=events.findIndex(e=>e.date===date);
   const present=new Set(attendanceDraft);
+  const savedAttendanceIds=attendance[date]||[];
+  const attendanceChanged=[...attendanceDraft].sort((a,b)=>a-b).join(",")!==[...savedAttendanceIds].sort((a,b)=>a-b).join(",");
+  const attendanceIsConfirmed=confirmedAttendance.includes(date)&&!attendanceChanged;
   const nextEvent=events.find(e=>e.date>=TODAY&&!e.cancelled);
-  const pastEvents=events.filter(e=>e.date<TODAY&&!e.cancelled&&confirmedAttendance.includes(e.date));
+  const pastEvents=events.filter(e=>e.date<=currentDate&&!e.cancelled&&confirmedAttendance.includes(e.date));
   const lastFive=pastEvents.slice(-5).reverse();
   const lastThree=pastEvents.slice(-3);
   const personStatsFor = person => {
@@ -1006,8 +1001,12 @@ export default function App(){
     setAttendanceSavedNotice(false);
   };
   const confirmAttendance=()=>{
-    setAttendance(old=>({...old,[date]:[...attendanceDraft]}));
-    setConfirmedAttendance(old=>old.includes(date)?old:[...old,date].sort());
+    const nextAttendance={...attendance,[date]:[...attendanceDraft]};
+    const nextConfirmed=confirmedAttendance.includes(date)?confirmedAttendance:[...confirmedAttendance,date].sort();
+    setAttendance(nextAttendance);
+    setConfirmedAttendance(nextConfirmed);
+    localStorage.setItem(STORAGE_KEYS.attendance,JSON.stringify(nextAttendance));
+    localStorage.setItem(STORAGE_KEYS.confirmedAttendance,JSON.stringify(nextConfirmed));
     setAttendanceSavedNotice(true);
     window.setTimeout(()=>setAttendanceSavedNotice(false),2500);
   };
@@ -1197,8 +1196,9 @@ export default function App(){
 
       {view==="attendance"&&<>
         <section className="rounded-3xl bg-white p-4"><div className="flex items-center justify-between"><button disabled={eventIndex<=0} onClick={()=>setDate(events[eventIndex-1].date)} className="rounded-full border p-3 disabled:opacity-20"><ChevronLeft/></button><div className="text-center"><p className="text-xs font-black uppercase tracking-widest text-blue-600">Anwesenheit</p><h2 className="font-black">{fmt(date)}</h2><p className={selectedEvent.cancelled?"text-red-600":"text-emerald-600"}>{selectedEvent.cancelled?"Ausfall":`${present.size} / ${people.length} anwesend`}</p></div><button disabled={eventIndex===events.length-1} onClick={()=>setDate(events[eventIndex+1].date)} className="rounded-full border p-3 disabled:opacity-20"><ChevronRight/></button></div><select value={date} onChange={e=>setDate(e.target.value)} className="mt-4 w-full rounded-2xl border bg-slate-50 p-3">{events.map(e=><option value={e.date} key={e.date}>{fmt(e.date)}{e.cancelled?" · Ausfall":""}</option>)}</select><button onClick={()=>setDate(nextEvent.date)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 py-3 font-bold text-blue-700"><CalendarDays size={18}/>Heute</button></section>
+        {!selectedEvent.cancelled&&<button type="button" onClick={confirmAttendance} className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left shadow-sm ${attendanceIsConfirmed?"bg-emerald-600 text-white":"bg-red-600 text-white"}`}><span><span className="block text-[10px] font-black uppercase tracking-wider opacity-80">Anwesenheitsstatus</span><b className="text-sm">{attendanceIsConfirmed?"Quittiert und aktuell":"Änderungen noch nicht quittiert"}</b></span><span className="rounded-xl bg-white/20 px-3 py-2 text-xs font-black">{attendanceIsConfirmed?"Grün · quittiert":"Rot · quittieren"}</span></button>}
         <div className="flex gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-3 text-slate-400" size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Teilnehmer suchen" className="w-full rounded-2xl border bg-white py-2.5 pl-10"/></div><button onClick={()=>setShowChecked(v=>!v)} className="rounded-2xl border bg-white px-3 text-xs font-bold">{showChecked?"Abgehakte ausblenden":"Alle zeigen"}</button></div>
-        {selectedEvent.cancelled?<div className="rounded-3xl bg-red-50 p-5 text-red-700"><Ban className="mb-2"/><b>Dieser Termin ist als Ausfall hinterlegt.</b></div>:<><section className="overflow-hidden rounded-3xl bg-white">{attendancePeople.map(p=><button key={p.id} onClick={()=>toggleAttendance(p.id)} className="flex w-full items-center gap-3 border-b p-4 text-left"><span className={`grid h-11 w-11 place-items-center rounded-2xl border-2 ${present.has(p.id)?"border-emerald-600 bg-emerald-600 text-white":"border-slate-200 text-transparent"}`}><Check/></span><b className="flex-1">{p.last}, {p.first}</b></button>)}</section><section className={`rounded-3xl border p-4 shadow-sm ${confirmedAttendance.includes(date)?"border-emerald-200 bg-emerald-50":"border-blue-200 bg-blue-50"}`}><div className="flex items-start gap-3"><div className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${confirmedAttendance.includes(date)?"bg-emerald-600":"bg-blue-600"} text-white`}><CheckCircle2 size={22}/></div><div className="min-w-0 flex-1"><h3 className="font-black">{confirmedAttendance.includes(date)?"Anwesenheit bereits quittiert":"Anwesenheit fertig?"}</h3><p className="mt-1 text-xs leading-relaxed text-slate-600">Mit dem Quittieren werden Startseite, Fehlzeiten, Prozentwerte und Gesamtübersicht aktualisiert. Spätere Änderungen sind weiterhin möglich und müssen erneut quittiert werden.</p></div></div><button type="button" onClick={confirmAttendance} className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3.5 font-black text-white active:scale-[.98]"><Check size={19}/>{confirmedAttendance.includes(date)?"Änderungen erneut quittieren":"Anwesenheit quittieren"}</button>{attendanceSavedNotice&&<p className="mt-3 text-center text-xs font-black text-emerald-700">Gespeichert und alle Auswertungen aktualisiert.</p>}</section></>}
+        {selectedEvent.cancelled?<div className="rounded-3xl bg-red-50 p-5 text-red-700"><Ban className="mb-2"/><b>Dieser Termin ist als Ausfall hinterlegt.</b></div>:<><section className="overflow-hidden rounded-3xl bg-white">{attendancePeople.map(p=><button key={p.id} onClick={()=>toggleAttendance(p.id)} className="flex w-full items-center gap-3 border-b p-4 text-left"><span className={`grid h-11 w-11 place-items-center rounded-2xl border-2 ${present.has(p.id)?"border-emerald-600 bg-emerald-600 text-white":"border-slate-200 text-transparent"}`}><Check/></span><b className="flex-1">{p.last}, {p.first}</b></button>)}</section><section className={`rounded-3xl border p-5 shadow-sm ${attendanceIsConfirmed?"border-emerald-200 bg-emerald-50":"border-red-200 bg-red-50"}`}><div className="flex items-start gap-3"><div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-white ${attendanceIsConfirmed?"bg-emerald-600":"bg-red-600"}`}><CheckCircle2 size={24}/></div><div><h3 className="text-lg font-black">{attendanceIsConfirmed?"Anwesenheit quittiert":"Anwesenheit noch nicht quittiert"}</h3><p className="mt-1 text-xs leading-relaxed text-slate-600">Beim Quittieren werden erfasste Termine, Fehlzeiten, Prozentwerte, Teilnehmerquoten und die Gesamtübersicht sofort neu berechnet. Nachträgliche Änderungen bleiben möglich.</p></div></div><button type="button" onClick={confirmAttendance} className={`mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-black text-white shadow-lg active:scale-[.98] ${attendanceIsConfirmed?"bg-emerald-600":"bg-red-600"}`}><Check size={21}/>{attendanceIsConfirmed?"Anwesenheit erneut quittieren":"Anwesenheit jetzt quittieren"}</button>{attendanceSavedNotice&&<p className="mt-3 text-center text-xs font-black text-emerald-700">Gespeichert. Alle Listen und Quoten wurden aktualisiert.</p>}</section></>}
       </>}
 
       {view==="people"&&<>
