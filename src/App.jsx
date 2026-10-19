@@ -866,6 +866,9 @@ export default function App(){
     }));
   const [date,setDate]=useState("2026-10-12");
   const [query,setQuery]=useState("");
+  const [peopleFilter,setPeopleFilter]=useState("all");
+  const [leaderFilter,setLeaderFilter]=useState("");
+  const [showHJOverview,setShowHJOverview]=useState(false);
   const [showChecked,setShowChecked]=useState(true);
   const [adding,setAdding]=useState(false);
   const [draft,setDraft]=useState(blank);
@@ -960,7 +963,12 @@ export default function App(){
   };
   const missedThree=lastThree.length===3?people.filter(p=>{const wasAlreadyParticipant=lastThree.every(e=>!p.joinDate||e.date>=p.joinDate);return wasAlreadyParticipant&&lastThree.every(e=>!(attendance[e.date]||[]).includes(p.id));}):[];
   const lowAttendancePeople=people.map(person=>({person,stats:personStatsFor(person)})).filter(item=>item.stats.total>0&&item.stats.percent<=50).sort((a,b)=>a.stats.percent-b.stats.percent||a.person.last.localeCompare(b.person.last,"de"));
-  const filteredPeople=people.filter(p=>`${p.last} ${p.first}`.toLowerCase().includes(query.toLowerCase()));
+  const leaderAliases={sa:"Samuel",st:"Stephan",j:"Julien",d:"Davis"};
+  const normalizedLeaderFilter=leaderFilter.trim().toLowerCase();
+  const leaderMatches=p=>{if(!normalizedLeaderFilter)return true;const v=String(p.v||"").toLowerCase();return v.includes(normalizedLeaderFilter)||String(leaderAliases[v]||"").toLowerCase().includes(normalizedLeaderFilter)};
+  const isPianoPlayer=p=>/klav(?:ier|\.)?/i.test(p.instrument||"");
+  const filteredPeople=people.filter(p=>`${p.last} ${p.first}`.toLowerCase().includes(query.toLowerCase())).filter(leaderMatches).filter(p=>peopleFilter==="piano"?isPianoPlayer(p):peopleFilter==="hj1done"?!!p.hj1:peopleFilter==="hj1open"?!p.hj1:peopleFilter==="hj2done"?!!p.hj2:peopleFilter==="hj2open"?!p.hj2:true);
+  const hjOverviewPeople=people.filter(leaderMatches);
   const attendancePeople=filteredPeople.filter(p=>showChecked||!present.has(p.id));
   const overviewStartDate=events.find(e=>schoolYearFor(e.date)===currentSchoolYear&&!e.cancelled&&e.date>=`${currentDate.slice(0,4)}-08-01`)?.date||`${currentDate.slice(0,4)}-08-01`;
     const overviewEvents=events.filter(e=>e.date>=overviewStartDate&&e.date<=currentDate&&schoolYearFor(e.date)===currentSchoolYear);
@@ -1132,7 +1140,7 @@ export default function App(){
         </div>
 
         <section className="grid gap-3 sm:grid-cols-2">
-          {filteredPeople.map(p=>{
+          <section className="rounded-3xl bg-white p-4 shadow-sm"><div className="grid gap-3 sm:grid-cols-2"><input value={leaderFilter} onChange={e=>setLeaderFilter(e.target.value)} placeholder="Leiter filtern, z. B. Stephan" className="w-full rounded-2xl border bg-slate-50 p-3 text-base sm:text-sm"/><select value={peopleFilter} onChange={e=>setPeopleFilter(e.target.value)} className="w-full rounded-2xl border bg-slate-50 p-3 text-base sm:text-sm"><option value="all">Alle Teilnehmer</option><option value="piano">Alle Klavierspieler</option><option value="hj1done">HJ1 erledigt</option><option value="hj1open">HJ1 offen</option><option value="hj2done">HJ2 erledigt</option><option value="hj2open">HJ2 offen</option></select></div><p className="mt-2 text-xs font-bold text-slate-500">{filteredPeople.length} von {people.length} Personen</p></section><button type="button" onClick={()=>setShowHJOverview(v=>!v)} className="flex w-full items-center justify-between rounded-3xl bg-emerald-700 p-4 text-white"><b>HJ1 und HJ2 kompakt</b><ChevronRight className={showHJOverview?"rotate-90":""}/></button>{showHJOverview&&<section className="rounded-3xl bg-white p-4"><div className="grid grid-cols-2 gap-2"><b>HJ1 erledigt: {hjOverviewPeople.filter(p=>p.hj1).length}</b><b>HJ1 offen: {hjOverviewPeople.filter(p=>!p.hj1).length}</b><b>HJ2 erledigt: {hjOverviewPeople.filter(p=>p.hj2).length}</b><b>HJ2 offen: {hjOverviewPeople.filter(p=>!p.hj2).length}</b></div><div className="mt-3 grid gap-2">{hjOverviewPeople.map(p=><div key={p.id} className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-2xl bg-slate-50 p-3"><span><b>{p.last}, {p.first}</b><small className="block">Leiter: {p.v||"nicht zugeordnet"}</small></span><b>{p.hj1?"HJ1 ✓":"HJ1 offen"}</b><b>{p.hj2?"HJ2 ✓":"HJ2 offen"}</b></div>)}</div></section>}{filteredPeople.map(p=>{
             const editing=editingPersonId===p.id;
             const stats=personStats(p);
             const number=overviewPeople.findIndex(person=>person.id===p.id)+1;
