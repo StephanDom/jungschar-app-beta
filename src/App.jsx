@@ -872,8 +872,8 @@ export default function App(){
     const futurePreacherEvents=preacherEvents.filter(event=>event.date>=nextEvent.date);
     const previousPreacherEvent=preacherEvents.filter(event=>event.date<nextEvent.date).at(-1);
     const preacherDisplayEvents=[...(previousPreacherEvent?[previousPreacherEvent]:[]),...futurePreacherEvents];
-    const preacherHistory=Object.entries(preachers).filter(([,assignment])=>assignment?.preached&&assignment?.askedName).map(([date,assignment])=>({date,name:assignment.askedName})).sort((a,b)=>b.date.localeCompare(a.date));
-    const preacherOverview=Object.values(preacherHistory.reduce((result,item)=>{if(!result[item.name])result[item.name]={name:item.name,dates:[]};result[item.name].dates.push(item.date);return result;},{})).sort((a,b)=>b.dates.length-a.dates.length||a.name.localeCompare(b.name,"de"));
+    const preacherHistory=Object.entries(preachers).filter(([,assignment])=>assignment?.preached&&assignment?.askedName&&assignment.askedName!=="Allgemeine Gebetstunde").map(([date,assignment])=>({date,name:assignment.askedName})).sort((a,b)=>a.date.localeCompare(b.date));
+    const preacherOverview=Object.values(preacherHistory.reduce((result,item)=>{if(!result[item.name])result[item.name]={name:item.name,dates:[]};result[item.name].dates.push(item.date);return result;},{})).map(item=>({...item,dates:[...item.dates].sort((a,b)=>a.localeCompare(b))})).sort((a,b)=>a.dates[0].localeCompare(b.dates[0]));
     const preacherName=eventDate=>preachers[eventDate]?.askedName||"Noch nicht festgelegt";
   const personStats = person => personStatsFor(person);
 
