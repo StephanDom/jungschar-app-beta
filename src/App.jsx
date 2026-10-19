@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  AlertTriangle, ArrowUp, Ban, BookOpen, CalendarDays, Camera, Cake, Check, CheckCircle2,
+  AlertTriangle, ArrowUp, Ban, BookOpen, CalendarDays, Camera, Check, CheckCircle2,
   ChevronLeft, ChevronRight, ClipboardList, Home,
   Pencil, Plus, Search, Trash2, Users, X
 } from "lucide-react";
@@ -13,8 +13,7 @@ const STORAGE_KEYS = {
   schedule: "jungschar.schedule.v023",
   preachers: "jungschar.preachers.v01",
   preacherRoster: "jungschar.preacherRoster.v01",
-  photo: "jungschar.photo.v02",
-  leaderBirthdays: "jungschar.leaderBirthdays.v01"
+  photo: "jungschar.photo.v02"
 };
 
 const readStored = (key, fallback) => {
@@ -179,17 +178,6 @@ const personDetailsSeed = {
   }
 };
 
-const birthdayByName = {
-  "Negura Janick":"09.01","Shyrai Arsen":"15.02","Schefer Jamian":"15.02","Domanski Kerstin":"06.03",
-  "Stiller Ina":"07.03","Kalistratov Jana":"13.03","Kalistratov Liana":"13.03","Wedernikow Sophia":"13.03",
-  "Krom Viktoria":"22.03","Brant Melia":"23.03","Marchuk Vitali":"16.04","Akulenko Mike":"27.04",
-  "Metzler Alica":"04.05","Vogel Daniel":"04.05","Domanski Celine":"09.06","Kuhai Alica":"19.07",
-  "Firus Lajana":"22.07","Fast Tobias":"19.08","Biegler Calvin":"25.08","Blackshear Amaya":"04.09",
-  "Sippel Daniel":"09.09","Scherer Amelie":"16.09","Rudyk Yevheniia":"20.09","Kopp Hannah":"19.10",
-  "Schwarz Lauryn":"24.10","Kliwer Fynn":"26.11","Wall Nick":"29.11","Marchuk Roman":"02.12"
-};
-const leaderBirthdaySeed = {"Stephan Domanski":"01.03","Julien Vogel":"26.03","Samuel Kliwer":"30.08","Davis Kliwer":"21.11"};
-
 const peopleSeed = [
   [1,"Akulenko","Mike","X","Sa","I",""],[2,"Biegler","Calvin","","St","I",""],
   [3,"Blackshear","Amaya","X","St","",""],[4,"Brant","Melia","X","J","I",""],
@@ -206,11 +194,7 @@ const peopleSeed = [
   [25,"Sippel","Daniel","","J","",""],[26,"Stiller","Ina","","Sa","I",""],
   [27,"Vlasiuk","Lisa","","St","",""],[28,"Vogel","Daniel","X","St","I",""],
   [29,"Wall","Nick","X","J","",""],[30,"Wedernikow","Sophia","X","J","",""]
-].map(([id,last,first,hg,v,hj1,hj2]) => {
-  const key=`${last} ${first}`;
-  const aliases={"Negura Jannik":"Negura Janick","Marchuk Vitaly":"Marchuk Vitali"};
-  return {id,last,first,hg,v:personDetailsSeed[id]?.v||v,hj1,hj2,duty:personDetailsSeed[id]?.duty||"",instrument:personDetailsSeed[id]?.instrument||"",birthday:birthdayByName[aliases[key]||key]||""};
-});
+].map(([id,last,first,hg,v,hj1,hj2]) => ({id,last,first,hg,v:personDetailsSeed[id]?.v||v,hj1,hj2,duty:personDetailsSeed[id]?.duty||"",instrument:personDetailsSeed[id]?.instrument||""}));
 
 const scheduleSeed = [
   {
@@ -706,7 +690,7 @@ const attendanceSeed = {
   "2026-10-12":[1,3,6,7,8,9,10,11,13,14,16,17,20,23,25,26,27,28]
 };
 
-const blank = {first:"",last:"",birthday:"",hg:"",v:"",hj1:"",hj2:"",duty:"",instrument:"",joinDate:TODAY};
+const blank = {first:"",last:"",hg:"",v:"",hj1:"",hj2:"",duty:"",instrument:"",joinDate:TODAY};
 const fmt = date => new Intl.DateTimeFormat("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric",timeZone:"UTC"}).format(new Date(`${date}T12:00:00Z`));
 const shortDate = date => `${date.slice(8,10)}.${date.slice(5,7)}.`;
 const sortPeople = list => [...list].sort((a,b)=>a.last.localeCompare(b.last,"de")||a.first.localeCompare(b.first,"de"));
@@ -725,7 +709,7 @@ function AddPerson({draft,setDraft,onSave,onClose}){
   return <div className="fixed inset-0 z-50 flex items-end bg-slate-950/50 backdrop-blur-sm sm:items-center sm:justify-center">
     <div className="max-h-[92vh] w-full overflow-auto rounded-t-[32px] bg-white p-5 sm:max-w-xl sm:rounded-[32px]">
       <div className="flex justify-between"><div><p className="text-xs font-black uppercase tracking-widest text-blue-600">Teilnehmer</p><h2 className="text-2xl font-black">Teilnehmer hinzufügen</h2></div><button onClick={onClose} className="rounded-full bg-slate-100 p-2"><X/></button></div>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">{[["Vorname","first"],["Nachname","last"],["Geburtstag (TT.MM.)","birthday"],["Eintrittsdatum","joinDate"],["Verantwortlicher Leiter","v"],["Dienst","duty"],["Instrument","instrument"]].map(([label,key])=><label key={key} className={key==="instrument"?"sm:col-span-2":""}><span className="mb-1 block text-sm font-bold text-slate-600">{label}</span><input type={key==="joinDate"?"date":"text"} value={draft[key]} onChange={e=>setDraft({...draft,[key]:e.target.value})} className="w-full rounded-2xl border bg-slate-50 p-3"/></label>)}</div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">{[["Vorname","first"],["Nachname","last"],["Eintrittsdatum","joinDate"],["Verantwortlicher Leiter","v"],["Dienst","duty"],["Instrument","instrument"]].map(([label,key])=><label key={key} className={key==="instrument"?"sm:col-span-2":""}><span className="mb-1 block text-sm font-bold text-slate-600">{label}</span><input type={key==="joinDate"?"date":"text"} value={draft[key]} onChange={e=>setDraft({...draft,[key]:e.target.value})} className="w-full rounded-2xl border bg-slate-50 p-3"/></label>)}</div>
       <div className="mt-4 grid grid-cols-3 gap-2"><Flag active={!!draft.hg} label="Heiliger Geist" color="violet" onClick={()=>setDraft({...draft,hg:draft.hg?"":"X"})}/><Flag active={!!draft.hj1} label="Gespräch HJ1" onClick={()=>setDraft({...draft,hj1:draft.hj1?"":"X"})}/><Flag active={!!draft.hj2} label="Gespräch HJ2" onClick={()=>setDraft({...draft,hj2:draft.hj2?"":"X"})}/></div>
       <button disabled={!draft.first.trim()||!draft.last.trim()||!draft.joinDate} onClick={onSave} className="mt-5 w-full rounded-2xl bg-blue-600 py-3.5 font-black text-white disabled:opacity-40">Teilnehmer speichern</button>
     </div>
@@ -761,7 +745,7 @@ export default function App(){
     return sortPeople(stored.map(person=>{
       const seed=peopleSeed.find(item=>item.id===person.id);
       if(!seed) return person;
-      return {...seed,...person,v:person.v||seed.v||"",duty:person.duty||seed.duty||"",instrument:person.instrument||seed.instrument||"",birthday:person.birthday||seed.birthday||""};
+      return {...seed,...person,v:person.v||seed.v||"",duty:person.duty||seed.duty||"",instrument:person.instrument||seed.instrument||""};
     }));
   });
   const [attendance,setAttendance]=useState(() => readStored(STORAGE_KEYS.attendance, attendanceSeed));
@@ -783,8 +767,6 @@ export default function App(){
   const [addingEvent,setAddingEvent]=useState(false);
   const [eventDraft,setEventDraft]=useState({date:"",content:"",responsible:""});
   const [photo,setPhoto]=useState(() => readStored(STORAGE_KEYS.photo, ""));
-  const [leaderBirthdays,setLeaderBirthdays]=useState(() => readStored(STORAGE_KEYS.leaderBirthdays, leaderBirthdaySeed));
-  const [showLeaderBirthdayEditor,setShowLeaderBirthdayEditor]=useState(false);
   const [showScrollTop,setShowScrollTop]=useState(false);
   const [showVisits,setShowVisits]=useState(false);
   const [showPastAttendanceConfirm,setShowPastAttendanceConfirm]=useState(false);
@@ -804,7 +786,6 @@ export default function App(){
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.preachers, JSON.stringify(preachers)); }, [preachers]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.preacherRoster, JSON.stringify(preacherRoster)); }, [preacherRoster]);
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.leaderBirthdays, JSON.stringify(leaderBirthdays)); }, [leaderBirthdays]);
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.photo, JSON.stringify(photo));
@@ -856,8 +837,6 @@ export default function App(){
   const overviewEvents=events.filter(e=>e.date<=TODAY&&(attendance[e.date]||e.cancelled));
   const overviewPeople=sortPeople(people);
   const nextSchedule=schedule.find(item=>item.date===nextEvent.date)||{content:"",responsible:""};
-  const eventDayMonth=eventDate=>`${eventDate.slice(8,10)}.${eventDate.slice(5,7)}`;
-  const birthdaysForNextEvent=[...people.filter(p=>p.birthday===eventDayMonth(nextEvent.date)).map(p=>`${p.first} ${p.last}`),...Object.entries(leaderBirthdays).filter(([,b])=>b===eventDayMonth(nextEvent.date)).map(([name])=>name)];
   const preacherEvents=[...events].filter(event=>!event.cancelled);
   const preacherDisplayEvents=[...preacherEvents.filter(event=>event.date>=TODAY),...preacherEvents.filter(event=>event.date<TODAY).reverse()];
   const preacherName=eventDate=>preachers[eventDate]?.askedName||"Noch nicht festgelegt";
@@ -966,10 +945,8 @@ export default function App(){
           </div>
         </section>
         <section className="rounded-[34px] bg-gradient-to-br from-blue-700 to-indigo-950 p-6 text-white shadow-xl"><p className="text-sm text-blue-200">Nächster Termin</p><h2 className="mt-1 text-3xl font-black">{fmt(nextEvent.date)}</h2><div className="mt-4 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm"><p className="text-[10px] font-black uppercase tracking-wider text-blue-200">Stundeninhalt</p><p className="mt-1 text-sm font-bold leading-relaxed">{nextSchedule.content||"Noch kein Inhalt eingetragen"}</p></div><div className="mt-3 grid grid-cols-2 gap-3"><div className="rounded-2xl border border-white/15 bg-white/10 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-blue-200">Verantwortlich</p><p className="mt-1 text-sm font-bold">{nextSchedule.responsible||"Offen"}</p></div><div className="rounded-2xl border border-white/15 bg-white/10 p-3"><p className="text-[10px] font-black uppercase tracking-wider text-blue-200">Segensgebet</p><p className="mt-1 text-sm font-bold">{preacherName(nextEvent.date)}</p></div></div><div className="mt-4 grid gap-2 sm:grid-cols-2"><button onClick={()=>{setDate(nextEvent.date);navigateTo("attendance")}} className="rounded-2xl bg-white px-4 py-3 font-bold text-blue-700">Anwesenheit erfassen</button><button onClick={()=>navigateTo("preachers",{resetTarget:true})} className="flex items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/10 px-4 py-3 font-bold text-white"><BookOpen size={18}/>Predigerliste öffnen</button></div></section>
-        {birthdaysForNextEvent.length>0&&<section className="rounded-3xl border border-pink-200 bg-gradient-to-br from-pink-50 to-amber-50 p-5 shadow-sm"><div className="flex items-start gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-pink-500 text-white"><Cake size={22}/></div><div><p className="text-[10px] font-black uppercase tracking-widest text-pink-700">Geburtstag am nächsten Termin</p><h3 className="mt-1 text-lg font-black">{birthdaysForNextEvent.join(", ")}</h3><p className="mt-1 text-xs text-slate-600">Am {shortDate(nextEvent.date)} unbedingt daran denken.</p></div></div></section>}
-        <section className="rounded-3xl bg-white p-4 shadow-sm"><button type="button" onClick={()=>setShowLeaderBirthdayEditor(v=>!v)} className="flex w-full items-center justify-between text-left"><div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Im Hintergrund</p><b className="text-sm">Geburtstage der Leiter bearbeiten</b></div><Pencil size={16}/></button>{showLeaderBirthdayEditor&&<div className="mt-4 grid gap-2 sm:grid-cols-2">{Object.entries(leaderBirthdays).map(([name,birthday])=><label key={name} className="rounded-2xl bg-slate-50 p-3"><span className="mb-1 block text-xs font-bold text-slate-600">{name}</span><input value={birthday} onChange={e=>setLeaderBirthdays(old=>({...old,[name]:e.target.value}))} placeholder="TT.MM." inputMode="numeric" className="w-full rounded-xl border bg-white p-2 text-sm"/></label>)}</div>}</section>
         <section className="grid grid-cols-3 gap-3"><div className="rounded-3xl bg-white p-4"><b className="text-2xl">{people.length}</b><p className="text-xs text-slate-500">Teilnehmer</p></div><div className="rounded-3xl bg-white p-4"><b className="text-2xl">{pastEvents.length}</b><p className="text-xs text-slate-500">erfasste Termine</p></div><div className="rounded-3xl bg-white p-4"><b className="text-2xl text-amber-600">{missedThree.length}</b><p className="text-xs text-slate-500">3× gefehlt</p></div></section>
-        <section className="rounded-3xl bg-white p-5"><div className="flex items-center gap-2"><AlertTriangle className="text-amber-500"/><b>Letzte 3 erfasste Termine gefehlt</b></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{missedThree.length?missedThree.map(p=><div className="rounded-2xl bg-amber-50 p-3" key={p.id}><div className="font-bold">{p.last}, {p.first}</div><div className="mt-1 text-xs text-amber-800">{p.v?<>Verantwortlicher Leiter: <b>{p.v}</b></>:<i>Kein verantwortlicher Leiter hinterlegt</i>}</div></div>):<p className="text-sm text-slate-500">Keine Personen betroffen.</p>}</div><div className="my-5 border-t border-slate-200"/><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><AlertTriangle className="text-red-500"/><b>Gesamtanwesenheit bis 50 %</b></div><span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-black text-red-700">{lowAttendancePeople.length}</span></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{lowAttendancePeople.length?lowAttendancePeople.map(({person,stats})=><div className="flex items-center justify-between gap-3 rounded-2xl bg-red-50 p-3" key={person.id}><div><div className="font-bold">{person.last}, {person.first}</div><div className="mt-1 text-xs text-red-800">{stats.attended} von {stats.total} Terminen anwesend</div></div><span className="text-lg font-black text-red-700">{stats.percent}%</span></div>):<p className="text-sm text-slate-500">Keine Personen mit 50 % oder weniger.</p>}</div></section>
+        <section className="rounded-3xl bg-white p-5"><div className="flex items-center gap-2"><AlertTriangle className="text-amber-500"/><b>Letzte 3 erfasste Termine gefehlt</b></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{missedThree.length?missedThree.map(p=><div className="rounded-2xl bg-amber-50 p-3" key={p.id}><div className="font-bold">{p.last}, {p.first}</div><div className="mt-1 text-xs text-amber-800">{p.v?<>Verantwortlicher Leiter: <b>{p.v}</b></>:<i>Kein verantwortlicher Leiter hinterlegt</i>}</div></div>):<p className="text-sm text-slate-500">Keine Personen betroffen.</p>}</div><div className="my-5 border-t border-slate-200"/><button type="button" onClick={()=>setShowLowAttendance(value=>!value)} className="flex w-full items-center justify-between gap-3 text-left"><div className="flex items-center gap-2"><AlertTriangle className="text-red-500"/><b>Gesamtanwesenheit bis 50 %</b></div><div className="flex items-center gap-2"><span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-black text-red-700">{lowAttendancePeople.length}</span><ChevronRight size={18} className={`text-slate-400 transition-transform ${showLowAttendance?"rotate-90":""}`}/></div></button>{showLowAttendance&&<div className="mt-3 grid gap-2 sm:grid-cols-2">{lowAttendancePeople.length?lowAttendancePeople.map(({person,stats})=><div className="flex items-center justify-between gap-3 rounded-2xl bg-red-50 p-3" key={person.id}><div><div className="font-bold">{person.last}, {person.first}</div><div className="mt-1 text-xs text-red-800">{stats.attended} von {stats.total} Terminen anwesend</div></div><span className="text-lg font-black text-red-700">{stats.percent}%</span></div>):<p className="text-sm text-slate-500">Keine Personen mit 50 % oder weniger.</p>}</div>}</section>
       </>}
 
       {view==="attendance"&&<>
@@ -1003,7 +980,6 @@ export default function App(){
                   <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 font-black text-white">{number}</div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-black">{p.last}, {p.first}</div>
-                    <div className="mt-0.5 text-[11px] font-bold text-slate-500">{p.birthday||"Geburtstag offen"}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">LEITER · {p.v||"–"}</span>
                       <span className="text-lg font-black leading-none text-blue-700">{stats.percent}%</span>
@@ -1043,7 +1019,6 @@ export default function App(){
 
               {editing&&<div className="border-t border-blue-100 bg-blue-50/60 p-4">
                 <div className="grid gap-3">
-                  <label><span className="mb-1 block text-xs font-black text-slate-600">Geburtstag (TT.MM.)</span><input value={p.birthday||""} onChange={e=>updatePerson(p.id,"birthday",e.target.value)} placeholder="TT.MM." inputMode="numeric" className="w-full rounded-xl border bg-white p-2.5 text-sm"/></label>
                   <label><span className="mb-1 block text-xs font-black text-slate-600">Leiter</span><input value={p.v||""} onChange={e=>updatePerson(p.id,"v",e.target.value)} className="w-full rounded-xl border bg-white p-2.5 text-sm"/></label>
                   <label><span className="mb-1 block text-xs font-black text-slate-600">Dienst</span><input value={p.duty||""} onChange={e=>updatePerson(p.id,"duty",e.target.value)} className="w-full rounded-xl border bg-white p-2.5 text-sm"/></label>
                   <label><span className="mb-1 block text-xs font-black text-slate-600">Instrument</span><input value={p.instrument||""} onChange={e=>updatePerson(p.id,"instrument",e.target.value)} className="w-full rounded-xl border bg-white p-2.5 text-sm"/></label>
