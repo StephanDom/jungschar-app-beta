@@ -958,7 +958,9 @@ export default function App(){
   const savedAttendanceIds=attendance[date]||[];
   const attendanceChanged=[...attendanceDraft].sort((a,b)=>a-b).join(",")!==[...savedAttendanceIds].sort((a,b)=>a-b).join(",");
   const attendanceIsConfirmed=confirmedAttendance.includes(date)&&!attendanceChanged;
-  const nextEvent=events.find(e=>e.date>=TODAY&&!e.cancelled);
+  const nextEvent=events.find(e=>e.date>=TODAY&&!e.cancelled&&!confirmedAttendance.includes(e.date))
+    ||events.find(e=>e.date>TODAY&&!e.cancelled)
+    ||events.filter(e=>!e.cancelled).at(-1);
   const pastEvents=events.filter(e=>e.date<=currentDate&&!e.cancelled&&confirmedAttendance.includes(e.date));
   const lastFive=pastEvents.slice(-5).reverse();
   const lastThree=pastEvents.slice(-3);
@@ -1008,6 +1010,13 @@ export default function App(){
     localStorage.setItem(STORAGE_KEYS.attendance,JSON.stringify(nextAttendance));
     localStorage.setItem(STORAGE_KEYS.confirmedAttendance,JSON.stringify(nextConfirmed));
     setAttendanceSavedNotice(true);
+    const followingEvent=events.find(event=>event.date>date&&!event.cancelled);
+    if(followingEvent){
+      window.setTimeout(()=>{
+        setDate(followingEvent.date);
+        setAttendanceDraft([...(nextAttendance[followingEvent.date]||[])]);
+      },700);
+    }
     window.setTimeout(()=>setAttendanceSavedNotice(false),2500);
   };
   const toggleAttendance=id=>{
