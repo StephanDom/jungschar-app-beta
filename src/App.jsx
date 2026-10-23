@@ -7,6 +7,8 @@ import {
 import defaultGroupPhoto from "./assets/04_Jungschar-2012.jpg";
 
 const TODAY = "2026-10-15";
+const APP_VERSION = "2.0.0-dev";
+const APP_BUILD_DATE = "23.10.2026";
 const STORAGE_KEYS = {
   people: "jungschar.people.v02",
   attendance: "jungschar.attendance.v02",
@@ -19,7 +21,8 @@ const STORAGE_KEYS = {
   nextEventNotes: "jungschar.nextEventNotes.v01",
   nextEventNoteDone: "jungschar.nextEventNoteDone.v01",
   homeNoteOpen: "jungschar.homeNoteOpen.v01",
-  eventNotesOpen: "jungschar.eventNotesOpen.v01"
+  eventNotesOpen: "jungschar.eventNotesOpen.v01",
+  dataUpdatedAt: "jungschar.dataUpdatedAt.v01"
 };
 
 const readStored = (key, fallback) => {
@@ -901,6 +904,9 @@ export default function App(){
     const [showLowAttendance,setShowLowAttendance]=useState(false);
   const [editingPersonId,setEditingPersonId]=useState(null);
   const [reportScope,setReportScope]=useState("window");
+  const [dataUpdatedAt,setDataUpdatedAt]=useState(() => readStored(STORAGE_KEYS.dataUpdatedAt, null));
+  const [syncStatus]=useState("local");
+  const dataStandText=dataUpdatedAt?new Date(dataUpdatedAt).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"Noch kein gespeicherter Datenstand";
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.people, JSON.stringify(people));
@@ -923,6 +929,11 @@ export default function App(){
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.nextEventNoteDone, JSON.stringify(nextEventNoteDone)); }, [nextEventNoteDone]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.homeNoteOpen, JSON.stringify(homeNoteOpen)); }, [homeNoteOpen]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.eventNotesOpen, JSON.stringify(eventNotesOpen)); }, [eventNotesOpen]);
+  useEffect(() => {
+    if(!dataUpdatedAt) return;
+    localStorage.setItem(STORAGE_KEYS.dataUpdatedAt,JSON.stringify(dataUpdatedAt));
+  },[dataUpdatedAt]);
+  const markDataChanged=()=>setDataUpdatedAt(new Date().toISOString());
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.photo, JSON.stringify(photo));
@@ -1036,6 +1047,7 @@ export default function App(){
     setConfirmedAttendance(nextConfirmed);
     localStorage.setItem(STORAGE_KEYS.attendance,JSON.stringify(nextAttendance));
     localStorage.setItem(STORAGE_KEYS.confirmedAttendance,JSON.stringify(nextConfirmed));
+    markDataChanged();
     setAttendanceSavedNotice(true);
     window.setTimeout(()=>setAttendanceSavedNotice(false),2500);
   };
@@ -1058,21 +1070,22 @@ export default function App(){
     pendingPastAttendance.current=null;
     setShowPastAttendanceConfirm(false);
   };
-  const toggleFlag=(id,key)=>setPeople(old=>old.map(p=>p.id===id?{...p,[key]:p[key]?"":"X"}:p));
-  const updatePerson=(id,key,value)=>setPeople(old=>old.map(p=>p.id===id?{...p,[key]:value}:p));
-  const saveNew=()=>{setPeople(old=>sortPeople([...old,{...draft,id:Math.max(0,...old.map(p=>p.id))+1}]));setDraft(blank);setAdding(false);};
+  const toggleFlag=(id,key)=>{markDataChanged();setPeople(old=>old.map(p=>p.id===id?{...p,[key]:p[key]?"":"X"}:p));};
+  const updatePerson=(id,key,value)=>{markDataChanged();setPeople(old=>old.map(p=>p.id===id?{...p,[key]:value}:p));};
+  const saveNew=()=>{markDataChanged();setPeople(old=>sortPeople([...old,{...draft,id:Math.max(0,...old.map(p=>p.id))+1}]));setDraft(blank);setAdding(false);};
   const deletePerson=person=>{if(!window.confirm(`${person.first} ${person.last} wirklich löschen? Die Person wird auch aus allen Anwesenheitslisten entfernt.`))return;setPeople(old=>old.filter(p=>p.id!==person.id));setAttendance(old=>Object.fromEntries(Object.entries(old).map(([eventDate,ids])=>[eventDate,ids.filter(id=>id!==person.id)])));};
   const uploadPhoto=e=>{const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=()=>setPhoto(String(reader.result));reader.readAsDataURL(file);};
   const resetPhoto=()=>{setPhoto("");};
   const scheduleFor = eventDate => schedule.find(item=>item.date===eventDate) || {date:eventDate,content:"",responsible:""};
-  const updateSchedule = (eventDate,key,value) => setSchedule(old => {
+  const updateSchedule = (eventDate,key,value) => {markDataChanged();setSchedule(old => {
     const exists=old.some(item=>item.date===eventDate);
     const next=exists
       ? old.map(item=>item.date===eventDate?{...item,[key]:value}:item)
       : [...old,{date:eventDate,content:"",responsible:"",[key]:value}];
     return [...next].sort((a,b)=>a.date.localeCompare(b.date));
-  });
+  });};
   const saveNewEvent = () => {
+    markDataChanged();
     const eventDate=eventDraft.date;
     if(!eventDate) return;
     if(events.some(event=>event.date===eventDate)){
@@ -1122,7 +1135,7 @@ export default function App(){
       if(deleteEvent(eventDate)!==false) setSwipeOffsets(old=>{const next={...old};delete next[eventDate];return next;});
     }else setSwipeOffsets(old=>({...old,[eventDate]:0}));
   };
-  const updatePreacherAssignment=(eventDate,changes)=>setPreachers(old=>({...old,[eventDate]:{askedName:"",preached:false,...old[eventDate],...changes}}));
+  const updatePreacherAssignment=(eventDate,changes)=>{markDataChanged();setPreachers(old=>({...old,[eventDate]:{askedName:"",preached:false,...old[eventDate],...changes}}));};
   const addPreacher=()=>{const name=newPreacherName.trim();if(!name)return;if(preacherRoster.some(item=>item.toLowerCase()===name.toLowerCase())){window.alert("Diese Person ist bereits in der Predigerliste.");return;}setPreacherRoster(old=>[...old,name].sort((a,b)=>a.localeCompare(b,"de")));setNewPreacherName("");};
   const removePreacher=name=>{if(!window.confirm(`${name} wirklich aus der Predigerliste entfernen? Bereits gespeicherte Termine bleiben erhalten.`))return;setPreacherRoster(old=>old.filter(item=>item!==name));};
   const isVisitContent = content => /alten[- ]?\/?\s*und\s*krankenbesuch|alten-\s*und\s*krankenbesuch|altenbesuch|krankenbesuch/i.test(content);
@@ -1242,9 +1255,10 @@ export default function App(){
       }
     `}</style>
     <main className="mx-auto max-w-5xl space-y-4 p-4">
-      {view!=="home"&&<header><p className="text-xs font-black uppercase tracking-[.2em] text-blue-600">Jungschar-App</p><h1 className="text-3xl font-black">Jungschar 2012</h1><p className="text-sm text-slate-500">Datenstand bis 15.10.2026</p></header>}
+      {view!=="home"&&<header><p className="text-xs font-black uppercase tracking-[.2em] text-blue-600">Jungschar-App</p><h1 className="text-3xl font-black">Jungschar 2012</h1><p className="text-sm text-slate-500">Version {APP_VERSION} · {syncStatus==="local"?"lokaler Datenstand":"synchronisiert"} · {dataStandText}</p></header>}
 
       {view==="home"&&<>
+        <section className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Cloud-V2</p><p className="truncate text-xs font-bold text-slate-600">Version {APP_VERSION} · Stand {APP_BUILD_DATE}</p></div><div className="shrink-0 text-right"><div className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1.5 text-[10px] font-black text-amber-800"><span className="h-2 w-2 rounded-full bg-amber-500"/>{syncStatus==="local"?"Lokal gespeichert":"Synchronisiert"}</div><p className="mt-1 text-[9px] font-bold text-slate-400">Daten: {dataStandText}</p></div></section>
         <section className="relative h-[430px] overflow-hidden rounded-[34px] bg-slate-900 shadow-xl sm:h-[520px]">
           <img src={photo||defaultGroupPhoto} alt="Gruppenbild der Jungschar 2012" className="h-full w-full object-cover object-center"/>
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/35 via-transparent to-slate-950/90"/>
